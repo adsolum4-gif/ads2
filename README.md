@@ -7,6 +7,8 @@ User and admin apps for Adsterra: task reviews, VIP levels, wallets, deposits, a
 - User app — Vite + React, port `5173`
 - Admin app — Vite + React (MUI), port `5174`
 
+Production (`npm run build` / Vercel) puts the user app at `/` and the admin app at `/admin`.
+
 ## Setup
 
 ```bash

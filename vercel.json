@@ -1,0 +1,11 @@
+{
+  "installCommand": "npm install && npm --prefix admin install",
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/admin", "destination": "/admin/index.html" },
+    { "source": "/admin/", "destination": "/admin/index.html" },
+    { "source": "/admin/:path*", "destination": "/admin/index.html" },
+    { "source": "/((?!admin(?:/|$)).*)", "destination": "/index.html" }
+  ]
+}
