@@ -26,12 +26,10 @@ export const fetchDeposits = () => async (dispatch) => {
   }
 };
 
-export const submitDeposit = (formData) => async (dispatch) => {
+export const submitDeposit = (payload) => async (dispatch) => {
   dispatch(setSubmitting(true));
   try {
-    const { data } = await api.post("/api/deposits/", formData, {
-      headers: { "Content-Type": "multipart/form-data" },
-    });
+    const { data } = await api.post("/api/deposits/", payload);
     dispatch(setSubmitting(false));
     return { success: true, data: data.data, message: data.message };
   } catch (error) {

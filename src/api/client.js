@@ -48,8 +48,7 @@ export const authApi = {
     try {
       const { data } = await api.post("/auth/send_otp/", { email });
       const payload = data.data || data;
-      const message = payload?.otp_code ? `OTP sent. Code: ${payload.otp_code}` : data.message || "OTP sent.";
-      return { success: true, data: payload, message };
+      return { success: true, data: payload, message: payload.message || data.message || "OTP sent." };
     } catch (error) {
       return { success: false, message: flattenMessage(error.response?.data?.message, "Failed to send OTP. Please try again.") };
     }
@@ -65,7 +64,19 @@ export const authApi = {
   signupWithOtp: async (payload) => {
     try {
       const { data } = await api.post("/auth/signup_with_otp/", payload);
-      return { success: true, data: data.data || data, message: data.message || "Registration successful. Email verified." };
+      const body = data.data || data;
+      const user = body.user || body;
+      const access_token = body.access_token || body.access;
+      const refresh_token = body.refresh_token || body.refresh;
+      if (access_token) localStorage.setItem("accessToken", access_token);
+      if (refresh_token) localStorage.setItem("refreshToken", refresh_token);
+      return {
+        success: true,
+        data: user,
+        access_token,
+        refresh_token,
+        message: data.message || body.message || "Registration successful. Email verified.",
+      };
     } catch (error) {
       return { success: false, message: flattenMessage(error.response?.data?.message, "Registration failed. Please try again.") };
     }
@@ -87,11 +98,7 @@ export const authApi = {
     }
   },
   updateProfile: async (payload) => {
-    const form = new FormData();
-    Object.entries(payload).forEach(([key, value]) => {
-      if (value != null) form.append(key, value);
-    });
-    const { data } = await api.patch("/auth/update_profile/", form);
+    const { data } = await api.patch("/auth/update_profile/", payload);
     return data;
   },
   changePassword: async (payload) => {
@@ -100,6 +107,10 @@ export const authApi = {
   },
   changeTransactionPassword: async (payload) => {
     const { data } = await api.post("/auth/user_change_transactional_password/", payload);
+    return data;
+  },
+  setTransactionPassword: async (payload) => {
+    const { data } = await api.post("/auth/user_set_transactional_password/", payload);
     return data;
   },
 };
@@ -129,7 +140,8 @@ export const announcementApi = {
   markAnnouncementAsSeen: async (id) => {
     try {
       const { data } = await api.post("/site_admin/announcements/mark-seen/", { announcement_id: id });
-      return { success: true, message: data.message };
+      const payload = data.data || data;
+      return { success: true, notification: payload.notification || null, message: payload.message };
     } catch {
       return { success: false, message: "Failed to mark announcement as seen." };
     }

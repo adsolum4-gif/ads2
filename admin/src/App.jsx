@@ -18,10 +18,11 @@ import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
 import Video from "./pages/Video";
 import Profile from "./pages/Profile";
+import Refer from "./pages/Refer";
 
 function GuestOnly({ children }) {
   const user = useSelector((s) => s.userSlice.user);
-  if (user?.access_token) return <Navigate to="/home" replace />;
+  if (user?.access_token) return <Navigate to="/admin/home" replace />;
   return children;
 }
 
@@ -30,7 +31,7 @@ export default function App() {
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route
-          path="/"
+          path="/admin"
           element={
             <GuestOnly>
               <Login />
@@ -38,7 +39,7 @@ export default function App() {
           }
         />
         <Route
-          path="/home"
+          path="/admin/home"
           element={
             <ProtectedRoute>
               <AdminLayout />
@@ -60,9 +61,12 @@ export default function App() {
           <Route path="settings" element={<Settings />} />
           <Route path="video" element={<Video />} />
           <Route path="profile" element={<Profile />} />
-          <Route path="notifications" element={<Navigate to="/home" replace />} />
+          <Route path="refer" element={<Refer />} />
+          <Route path="notifications" element={<Navigate to="/admin/home" replace />} />
         </Route>
-        <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/" element={<Navigate to="/admin" replace />} />
+        <Route path="/home/*" element={<Navigate to="/admin/home" replace />} />
+        <Route path="*" element={<Navigate to="/admin" replace />} />
       </Routes>
       <Toaster position="top-center" closeButton richColors duration={6000} />
     </BrowserRouter>

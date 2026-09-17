@@ -30,6 +30,7 @@ import { MdContentCopy } from "react-icons/md";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { useAdminLiveRefresh } from "../live";
 
 export default function AllUsers() {
   const [loading, setLoading] = useState(true);
@@ -52,8 +53,8 @@ export default function AllUsers() {
   const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(false);
     try {
       const params = { page: page + 1, page_size: rows, search };
@@ -64,15 +65,16 @@ export default function AllUsers() {
       setUsers(Array.isArray(list) ? list : []);
       setCount(payload?.count || payload?.pagination?.count || (Array.isArray(list) ? list.length : 0));
     } catch {
-      setError(true);
+      if (!silent) setError(true);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     load();
   }, [page, rows, order]);
+  useAdminLiveRefresh(["user"], () => load(true));
 
   const cols = useMemo(
     () => [
@@ -249,7 +251,7 @@ export default function AllUsers() {
       </TableContainer>
 
       <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
-        <MenuItem onClick={() => { setDialog("login"); setForm({}); setMenu(null); }}>Update login password</MenuItem>
+        <MenuItem onClick={() => { setDialog("login"); setForm({}); setMenu(null); }}>Reset login password</MenuItem>
         <MenuItem onClick={() => { setDialog("withdraw"); setForm({}); setMenu(null); }}>Update withdrawal password</MenuItem>
         <MenuItem onClick={() => { setDialog("balance"); setForm({}); setMenu(null); }}>Update customer balance</MenuItem>
         <MenuItem onClick={() => { setDialog("profit"); setForm({}); setMenu(null); }}>Update Today’s profit</MenuItem>
@@ -272,13 +274,16 @@ export default function AllUsers() {
         <MenuItem sx={{ color: "error.main" }} onClick={() => { setDialog("delete"); setMenu(null); }}>Delete User</MenuItem>
       </Menu>
 
-      <ActionDialog open={dialog === "login"} title="Update Login Password" onClose={() => setDialog(null)} saving={saving} onSave={() => {
+      <ActionDialog open={dialog === "login"} title="Reset Login Password" onClose={() => setDialog(null)} saving={saving} saveLabel={saving ? "Resetting..." : "Reset password"} onSave={() => {
+        if (!form.password || !form.confirm) return toast.error("Enter and confirm the new password");
+        if (form.password.length < 6) return toast.error("Password must be at least 6 characters");
         if (form.password !== form.confirm) return toast.error("Passwords do not match");
+        if (!form.admin_password) return toast.error("Administrator password is required");
         postAction(endpoints.UPDATE_LOGIN_PASSWORD, { user_id: current.id, password: form.password, admin_password: form.admin_password });
       }}>
         <TextField label="User" fullWidth disabled value={current?.username || ""} />
-        <TextField label="Password" type="password" fullWidth value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
-        <TextField label="Confirm Password" type="password" fullWidth value={form.confirm || ""} onChange={(e) => setForm({ ...form, confirm: e.target.value })} />
+        <TextField label="New password" type="password" fullWidth value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <TextField label="Confirm password" type="password" fullWidth value={form.confirm || ""} onChange={(e) => setForm({ ...form, confirm: e.target.value })} />
         <TextField label="Administrator password" type="password" fullWidth value={form.admin_password || ""} onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
       </ActionDialog>
 

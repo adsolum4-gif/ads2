@@ -1,11 +1,11 @@
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { useDispatch } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 import {
   MdHome,
   MdPlayCircle,
   MdReceiptLong,
-  MdPerson,
+  MdSettings,
   MdNotifications,
   MdAccountBalanceWallet,
   MdAddCard,
@@ -19,8 +19,8 @@ const links = [
   { to: "/home", label: "Home", icon: MdHome, end: true },
   { to: "/home/starting", label: "Starting", icon: MdPlayCircle },
   { to: "/home/records", label: "Records", icon: MdReceiptLong },
-  { to: "/home/profile", label: "Profile", icon: MdPerson },
-  { to: "/home/notifications", label: "Notifications", icon: MdNotifications },
+  { to: "/home/settings", label: "Settings", icon: MdSettings },
+  { to: "/home/notifications", label: "Notifications", icon: MdNotifications, badge: true },
   { to: "/home/withdraw", label: "Withdraw", icon: MdAccountBalanceWallet },
   { to: "/home/deposit", label: "Deposit", icon: MdAddCard },
   { to: "/home/events", label: "Events", icon: MdEvent },
@@ -29,6 +29,7 @@ const links = [
 export default function Sidebar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
+  const unread = useSelector((s) => s.notifications.notifications.filter((n) => !n.is_read).length);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -52,7 +53,14 @@ export default function Sidebar() {
                   : "flex items-center gap-x-4 w-full px-5 py-3 hover:bg-gray-100 hover:text-gray-800 rounded-lg transition"
               }
             >
-              <link.icon className="text-2xl" />
+              <span className="relative">
+                <link.icon className="text-2xl" />
+                {link.badge && unread > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-red-200">
+                    {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+              </span>
               <p>{link.label}</p>
             </NavLink>
           </motion.div>

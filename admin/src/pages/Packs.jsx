@@ -66,7 +66,7 @@ export default function Packs() {
               <TableRow key={r.id}>
                 <TableCell>{i + 1}</TableCell>
                 <TableCell>
-                  <img src={r.icon || `/assets/vip/vip-${Math.min(8, Math.max(1, parseInt(String(r.name).replace(/\D/g, ""), 10) || 1))}.svg`} alt={r.name} className="w-10 h-10 object-contain" />
+                  <img src={r.icon || `/assets/vip/vip-${Math.min(10, Math.max(1, parseInt(String(r.name).replace(/\D/g, ""), 10) || 1))}.svg`} alt={r.name} className="w-10 h-10 object-contain" />
                 </TableCell>
                 <TableCell>{r.name}</TableCell>
                 <TableCell>{r.usd_value}</TableCell>

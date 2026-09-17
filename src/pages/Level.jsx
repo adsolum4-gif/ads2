@@ -3,14 +3,14 @@ import { useDispatch, useSelector } from "react-redux";
 import { motion } from "framer-motion";
 import BackButton from "../components/BackButton";
 import BottomNav from "../components/BottomNav";
-import VipBadge, { vipMeta, withEightVips } from "../components/VipBadge";
+import VipBadge, { vipMeta, withVipLevels } from "../components/VipBadge";
 import { fetchPacks } from "../store/slices/packsSlice";
 
 export default function Level() {
   const dispatch = useDispatch();
   const { packs, isLoading, error } = useSelector((s) => s.packs);
   const rawPacks = packs?.data || packs || [];
-  const list = withEightVips(rawPacks);
+  const list = withVipLevels(rawPacks);
 
   useEffect(() => {
     if (!rawPacks.length) dispatch(fetchPacks());
@@ -20,8 +20,8 @@ export default function Level() {
     <div className="p-2 md:p-6">
       <BackButton />
       <h2 className="text-2xl font-bold text-center mb-2 text-gray-800">VIP Levels</h2>
-      <p className="text-center text-sm text-gray-500 mb-6">Eight membership tiers, each with its own crown</p>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-5 md:mb-1 mb-52">
+      <p className="text-center text-sm text-gray-500 mb-6">Ten membership tiers, each with its own crown</p>
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-5 md:mb-1 mb-52">
         {isLoading ? (
           <p className="text-center col-span-full">Loading...</p>
         ) : error ? (

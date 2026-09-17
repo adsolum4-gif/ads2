@@ -15,7 +15,7 @@ export default function Notifications() {
 
   useEffect(() => {
     dispatch(fetchNotifications());
-    const id = setInterval(() => dispatch(fetchNotifications()), 120000);
+    const id = setInterval(() => dispatch(fetchNotifications(true)), 120000);
     return () => clearInterval(id);
   }, [dispatch]);
 
@@ -43,7 +43,8 @@ export default function Notifications() {
                 className={`bg-white p-4 rounded-lg shadow flex flex-col md:flex-row justify-between items-start md:items-center ${item.is_read ? "" : "border-l-4 border-red-600"}`}
               >
                 <div className="flex-1">
-                  <p className="text-gray-800 text-justify">{item.message}</p>
+                  {item.title && <p className="text-gray-900 font-semibold mb-1">{item.title}</p>}
+                  <p className="text-gray-800 text-justify whitespace-pre-line">{item.message}</p>
                   <p className="text-gray-500 text-sm mt-1">
                     {item.created_at ? formatDistanceToNow(new Date(item.created_at), { addSuffix: true }) : ""}
                   </p>

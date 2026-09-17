@@ -23,7 +23,7 @@ import { fetchPacks } from "../store/slices/packsSlice";
 import { authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure, toggleWelcomeState, setWelcomeState } from "../store/slices/profileSlice";
 import { fetchNotifications } from "../store/slices/notificationsSlice";
-import VipBadge, { vipMeta, withEightVips } from "../components/VipBadge";
+import VipBadge, { amountToReachVip, vipDepositState, vipFromBalance, vipLevel, vipMeta, withVipLevels } from "../components/VipBadge";
 
 const quickLinks = [
   { label: "Starting", icon: MdPlayCircle, route: "/home/starting" },
@@ -45,7 +45,9 @@ export default function Home() {
   const unread = notifications.filter((n) => !n.is_read).length;
   const { packs, isLoading, error } = useSelector((s) => s.packs);
   const rawPacks = packs?.data || packs || [];
-  const packList = withEightVips(rawPacks);
+  const packList = withVipLevels(rawPacks);
+  const balance = Number(user?.wallet?.balance || 0);
+  const currentVip = vipFromBalance(packList, balance);
 
   useEffect(() => {
     if (!rawPacks.length) dispatch(fetchPacks());
@@ -71,7 +73,7 @@ export default function Home() {
 
   useEffect(() => {
     dispatch(fetchNotifications());
-    const id = setInterval(() => dispatch(fetchNotifications()), 120000);
+    const id = setInterval(() => dispatch(fetchNotifications(true)), 120000);
     return () => clearInterval(id);
   }, [dispatch]);
 
@@ -158,7 +160,9 @@ export default function Home() {
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">VIP Levels</h2>
-            <p className="text-sm text-gray-500 mt-1">Choose your membership tier</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Your level is {currentVip?.name || "VIP 1"} from your ${balance.toFixed(2)} balance. Tap a crown to deposit the remaining amount.
+            </p>
           </div>
           <motion.button
             whileHover={{ scale: 1.05 }}
@@ -170,7 +174,7 @@ export default function Home() {
             <MdChevronRight className="text-2xl ml-1" />
           </motion.button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-5">
           {isLoading ? (
             <p className="col-span-full text-center text-gray-500 py-8">Loading packs...</p>
           ) : error ? (
@@ -178,6 +182,8 @@ export default function Home() {
           ) : packList.length > 0 ? (
             packList.map((pack, i) => {
               const meta = vipMeta(pack);
+              const remaining = amountToReachVip(pack, balance);
+              const isCurrent = vipLevel(pack) === vipLevel(currentVip);
               return (
                 <motion.div
                   key={pack.id || i}
@@ -185,8 +191,8 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.35 }}
                   whileHover={{ scale: 1.04, y: -4 }}
-                  onClick={() => navigate("/home/level")}
-                  className={`bg-white p-4 sm:p-5 rounded-xl cursor-pointer shadow-md hover:shadow-xl flex flex-col justify-center items-center transition-all duration-300 border ${meta.border}`}
+                  onClick={() => navigate("/home/deposit", { state: { upgrade: vipDepositState(pack, balance) } })}
+                  className={`bg-white p-4 sm:p-5 rounded-xl cursor-pointer shadow-md hover:shadow-xl flex flex-col justify-center items-center transition-all duration-300 border ${isCurrent ? "border-red-500 ring-2 ring-red-200" : meta.border}`}
                 >
                   <div className="flex justify-between w-full items-center mb-3">
                     <VipBadge pack={pack} size={44} />
@@ -196,6 +202,9 @@ export default function Home() {
                   <p className={`text-[11px] font-semibold uppercase tracking-wide mt-0.5 mb-2 ${meta.text}`}>{meta.title}</p>
                   <p className="text-gray-600 text-xs md:text-sm text-center leading-relaxed">
                     {pack.short_description || "No description available."}
+                  </p>
+                  <p className={`mt-2 text-[11px] font-semibold ${isCurrent ? "text-red-600" : remaining > 0 ? "text-gray-500" : "text-emerald-600"}`}>
+                    {isCurrent ? "Current level" : remaining > 0 ? `Deposit $${remaining.toFixed(2)} to unlock` : "Unlocked"}
                   </p>
                 </motion.div>
               );

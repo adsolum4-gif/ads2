@@ -5,3 +5,5 @@ dist
 _extract
 .env
 admin/.env
+supabase/.temp
+supabase/.temp-secrets.env

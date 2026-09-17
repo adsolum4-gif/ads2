@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import BackButton from "../components/BackButton";
 import { Spinner } from "../components/Loader";
 import { fetchWithdrawals, makeWithdrawal } from "../store/slices/withdrawalsSlice";
-import { showApiError } from "../api/client";
+import { authApi, showApiError } from "../api/client";
 import { slideIn } from "../utils/motion";
 import PasswordInput from "../components/PasswordInput";
 
@@ -18,6 +18,9 @@ export default function Withdraw() {
   const [tab, setTab] = useState("withdraw");
   const [amount, setAmount] = useState("");
   const [password, setPassword] = useState("");
+  const [showSetPin, setShowSetPin] = useState(false);
+  const [pin, setPin] = useState({ new_password: "", confirm_new_password: "" });
+  const [savingPin, setSavingPin] = useState(false);
 
   useEffect(() => {
     dispatch(fetchWithdrawals());
@@ -38,6 +41,34 @@ export default function Withdraw() {
       setAmount("");
       setPassword("");
       dispatch(fetchWithdrawals());
+    }
+  };
+
+  const saveWithdrawalPassword = async () => {
+    const next = pin.new_password;
+    const confirmPin = pin.confirm_new_password;
+    if (!next || !confirmPin) {
+      toast.error("Enter and confirm the withdrawal password.");
+      return;
+    }
+    if (next.length !== 4 || Number.isNaN(Number(next))) {
+      toast.error("Withdrawal password must be exactly 4 digits.");
+      return;
+    }
+    if (next !== confirmPin) {
+      toast.error("Withdrawal passwords do not match.");
+      return;
+    }
+    setSavingPin(true);
+    try {
+      await authApi.setTransactionPassword({ new_password: next });
+      toast.success("Withdrawal password set successfully.");
+      setShowSetPin(false);
+      setPin({ new_password: "", confirm_new_password: "" });
+    } catch (err) {
+      showApiError(err);
+    } finally {
+      setSavingPin(false);
     }
   };
 
@@ -63,9 +94,16 @@ export default function Withdraw() {
             <label className="block text-sm font-medium text-gray-700">Withdrawal Amount</label>
             <input type="number" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Enter amount" className="mt-1 p-3 w-full border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" />
           </div>
-          <div className="mb-10">
+          <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700">Withdrawal Password</label>
-            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" className="mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" />
+            <PasswordInput value={password} onChange={(e) => setPassword(e.target.value)} placeholder="Enter password" maxLength={4} className="mt-1 p-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" />
+            <button
+              type="button"
+              onClick={() => setShowSetPin(true)}
+              className="mt-3 w-full border border-red-200 text-red-600 font-semibold py-2.5 rounded-xl hover:bg-red-50"
+            >
+              Set withdrawal password
+            </button>
           </div>
           <button onClick={submit} disabled={submitting} className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 flex items-center justify-center">
             {submitting ? <Spinner /> : "Submit"}
@@ -94,6 +132,26 @@ export default function Withdraw() {
           ) : (
             <p className="text-center text-gray-500">No withdrawal history available.</p>
           )}
+        </div>
+      )}
+      {showSetPin && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-sm w-full relative">
+            <button onClick={() => setShowSetPin(false)} className="absolute top-4 right-4 text-gray-400 hover:text-gray-700 font-bold text-lg">✕</button>
+            <h2 className="text-xl font-bold mb-1">Set withdrawal password</h2>
+            <p className="text-sm text-gray-500 mb-4">Choose a 4-digit code for withdrawals. Current password is not required.</p>
+            <div className="mb-3">
+              <label className="text-gray-600 font-semibold text-sm">New withdrawal password</label>
+              <PasswordInput value={pin.new_password} onChange={(e) => setPin((p) => ({ ...p, new_password: e.target.value }))} placeholder="4 digits" maxLength={4} className="mt-1 p-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" />
+            </div>
+            <div className="mb-4">
+              <label className="text-gray-600 font-semibold text-sm">Confirm withdrawal password</label>
+              <PasswordInput value={pin.confirm_new_password} onChange={(e) => setPin((p) => ({ ...p, confirm_new_password: e.target.value }))} placeholder="4 digits" maxLength={4} className="mt-1 p-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-red-500/30 focus:border-red-500" />
+            </div>
+            <button onClick={saveWithdrawalPassword} className="w-full bg-red-600 text-white py-3 rounded-xl font-semibold flex justify-center hover:bg-red-700">
+              {savingPin ? <Spinner /> : "Save password"}
+            </button>
+          </div>
         </div>
       )}
     </div>

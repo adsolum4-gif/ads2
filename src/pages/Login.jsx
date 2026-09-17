@@ -7,7 +7,7 @@ import { FaCheckCircle } from "react-icons/fa";
 import { authApi, announcementApi } from "../api/client";
 import { loginSuccess, setUserProfile } from "../store/slices/authSlice";
 import { fetchProfileSuccess } from "../store/slices/profileSlice";
-import { fetchNotifications } from "../store/slices/notificationsSlice";
+import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
 import AnnouncementModal from "../components/AnnouncementModal";
 import PasswordInput from "../components/PasswordInput";
 import { Spinner } from "../components/Loader";
@@ -67,7 +67,11 @@ export default function Login() {
   };
 
   const closeAnnouncement = async () => {
-    if (announcement) await announcementApi.markAnnouncementAsSeen(announcement.id);
+    if (announcement?.id) {
+      const result = await announcementApi.markAnnouncementAsSeen(announcement.id);
+      if (result.notification) dispatch(prependNotification(result.notification));
+      else await dispatch(fetchNotifications(true));
+    }
     setShowAnnouncement(false);
     navigate("/home");
   };

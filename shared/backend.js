@@ -1,4 +1,5 @@
 import { supabase } from "./supabase";
+import { compressImage, isUploadFile } from "./compressImage";
 
 export const API_BASE = SUPABASE_PLACEHOLDER();
 
@@ -35,18 +36,107 @@ function norm(url = "") {
 
 async function uploadFile(bucket, file, prefix = "") {
   if (!file || typeof file === "string") return file || null;
-  const ext = (file.name || "bin").split(".").pop();
+  if (!isUploadFile(file)) return null;
+  let toUpload = file;
+  if (String(file.type || "").startsWith("image/") && file.size > 1024 * 1024) {
+    toUpload = await compressImage(file);
+  }
+  const ext = (toUpload.name || file.name || "jpg").split(".").pop() || "jpg";
   const path = `${prefix}${crypto.randomUUID()}.${ext}`;
-  const { error } = await supabase.storage.from(bucket).upload(path, file, { upsert: true });
+  const { error } = await supabase.storage.from(bucket).upload(path, toUpload, {
+    upsert: true,
+    contentType: toUpload.type || file.type || "image/jpeg",
+  });
   if (error) fail(error.message);
   const { data } = supabase.storage.from(bucket).getPublicUrl(path);
   return data.publicUrl;
 }
 
+function storedTokens() {
+  if (typeof localStorage === "undefined") return {};
+  try {
+    const admin = JSON.parse(localStorage.getItem("adminUser") || "null") || {};
+    return {
+      access: admin.access_token || admin.access || localStorage.getItem("accessToken"),
+      refresh: admin.refresh_token || admin.refresh || localStorage.getItem("refreshToken"),
+    };
+  } catch {
+    return {};
+  }
+}
+
+function asObject(value) {
+  if (value == null) return {};
+  if (typeof value === "string") {
+    try {
+      return JSON.parse(value);
+    } catch {
+      return {};
+    }
+  }
+  return typeof value === "object" ? value : {};
+}
+
 async function requireSession() {
-  const { data } = await supabase.auth.getSession();
+  let { data } = await supabase.auth.getSession();
+  if (!data.session) {
+    const { access, refresh } = storedTokens();
+    if (access && refresh) {
+      const restored = await supabase.auth.setSession({ access_token: access, refresh_token: refresh });
+      if (!restored.error) data = restored.data;
+    }
+  }
   if (!data.session) fail("Not authenticated", { status: 401 });
   return data.session;
+}
+
+const EMPTY_MONTHS = {
+  Jan: 0, Feb: 0, Mar: 0, Apr: 0, May: 0, Jun: 0,
+  Jul: 0, Aug: 0, Sep: 0, Oct: 0, Nov: 0, Dec: 0,
+};
+
+async function buildAdminDashboardFallback() {
+  try {
+    const [{ count: totalUsers }, { count: activeProducts }, { count: submissions }, { data: profiles }] = await Promise.all([
+      supabase.from("profiles").select("*", { count: "exact", head: true }),
+      supabase.from("products").select("*", { count: "exact", head: true }).eq("is_active", true),
+      supabase.from("games").select("*", { count: "exact", head: true }).eq("pending", false),
+      supabase
+        .from("profiles")
+        .select("username, total_negative_product_submitted, current_number_count, total_number_can_play, last_connection, wallets(balance, commission, on_hold)")
+        .order("last_connection", { ascending: false })
+        .limit(50),
+    ]);
+    const today = new Date().toISOString().slice(0, 10);
+    const loginToday = (profiles || []).filter((p) => String(p.last_connection || "").startsWith(today));
+    return {
+      total_users: totalUsers || 0,
+      active_products: activeProducts || 0,
+      total_submissions: submissions || 0,
+      user_registrations_per_month: { ...EMPTY_MONTHS },
+      total_submissions_per_month: { ...EMPTY_MONTHS },
+      total_users_login_today: {
+        count: loginToday.length,
+        users: loginToday.map((p) => ({
+          username: p.username,
+          total_negative_product_submitted: p.total_negative_product_submitted,
+          wallet: Array.isArray(p.wallets) ? p.wallets[0] : p.wallets,
+          total_play: p.current_number_count,
+          total_available_play: p.total_number_can_play,
+          last_connection: p.last_connection,
+        })),
+      },
+    };
+  } catch {
+    return {
+      total_users: 0,
+      active_products: 0,
+      total_submissions: 0,
+      user_registrations_per_month: { ...EMPTY_MONTHS },
+      total_submissions_per_month: { ...EMPTY_MONTHS },
+      total_users_login_today: { count: 0, users: [] },
+    };
+  }
 }
 
 async function signInByLogin(login, password) {
@@ -157,9 +247,25 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "POST" && path === "/auth/send_otp") {
-    const { data, error } = await supabase.rpc("send_otp", { p_email: payload.email });
-    if (error) rpcError(error);
-    return { success: true, data, message: data?.message || "OTP sent." };
+    const email = String(payload.email || "").trim().toLowerCase();
+    if (!email) fail("Please enter your email address.");
+    const { data, error } = await supabase.functions.invoke("send-otp", { body: { email } });
+    if (error) {
+      let message = error.message || "Failed to send OTP.";
+      try {
+        const body = typeof error.context?.json === "function" ? await error.context.json() : data;
+        if (body?.message) message = body.message;
+      } catch {
+        if (data?.message) message = data.message;
+      }
+      fail(message);
+    }
+    if (data?.success === false) fail(data.message || "Failed to send OTP.");
+    return {
+      success: true,
+      message: data?.message || "OTP sent.",
+      emailed: Boolean(data?.emailed),
+    };
   }
 
   if (m === "POST" && path === "/auth/verify_otp") {
@@ -188,14 +294,29 @@ async function handle(method, url, body, params = {}) {
       p_gender: payload.gender,
       p_invitation_code: payload.invitation_code,
       p_transactional_password: payload.transactional_password,
+      p_referral_token: payload.referral_token || null,
     });
     if (error) rpcError(error);
-    await supabase.auth.signOut();
-    return { success: true, data, message: "Registration successful. Email verified." };
+    const { data: sessionData } = await supabase.auth.getSession();
+    const session = sessionData.session;
+    if (!session) fail("Registration succeeded, but login failed. Please sign in.");
+    return {
+      success: true,
+      message: "Registration successful. Email verified.",
+      data: {
+        access: session.access_token,
+        access_token: session.access_token,
+        refresh: session.refresh_token,
+        refresh_token: session.refresh_token,
+        user: data,
+      },
+    };
   }
 
   if (m === "GET" && path === "/auth/me") {
     await requireSession();
+    await supabase.rpc("ensure_daily_reset");
+    await supabase.rpc("sync_vip_from_balance");
     const { data, error } = await supabase.rpc("get_full_profile");
     if (error) rpcError(error);
     return { data };
@@ -209,7 +330,7 @@ async function handle(method, url, body, params = {}) {
 
   if (m === "PATCH" && path === "/auth/update_profile") {
     const session = await requireSession();
-    const picture = payload.profile_picture instanceof File
+    const picture = isUploadFile(payload.profile_picture)
       ? await uploadFile("avatars", payload.profile_picture, `${session.user.id}/`)
       : undefined;
     const patch = {
@@ -225,6 +346,7 @@ async function handle(method, url, body, params = {}) {
     const { error } = await supabase.from("profiles").update(patch).eq("id", session.user.id);
     if (error) rpcError(error);
     const profile = await supabase.rpc("get_full_profile");
+    if (profile.error) rpcError(profile.error);
     return { data: profile.data };
   }
 
@@ -235,6 +357,15 @@ async function handle(method, url, body, params = {}) {
     const { error } = await supabase.auth.updateUser({ password: payload.new_password });
     if (error) rpcError(error);
     return { success: true, message: "Password updated successfully" };
+  }
+
+  if (m === "POST" && path === "/auth/user_set_transactional_password") {
+    await requireSession();
+    const next = String(payload.new_password || payload.password || "");
+    if (!/^\d{4}$/.test(next)) fail("Withdrawal password must be exactly 4 digits");
+    const { data, error } = await supabase.rpc("set_transactional_password", { p_new: next });
+    if (error) rpcError(error);
+    return data;
   }
 
   if (m === "POST" && path === "/auth/user_change_transactional_password") {
@@ -270,8 +401,42 @@ async function handle(method, url, body, params = {}) {
 
   if (m === "POST" && path === "/site_admin/announcements/mark-seen") {
     const session = await requireSession();
-    await supabase.from("announcement_seen").upsert({ user_id: session.user.id, announcement_id: payload.announcement_id });
-    return { success: true, message: "Marked as seen" };
+    const announcementId = payload.announcement_id;
+    await supabase.from("announcement_seen").upsert(
+      { user_id: session.user.id, announcement_id: announcementId },
+      { onConflict: "user_id,announcement_id" }
+    );
+    let notification = null;
+    const { data: ann } = await supabase
+      .from("announcements")
+      .select("id, title, message")
+      .eq("id", announcementId)
+      .maybeSingle();
+    if (ann) {
+      const { data: created, error: notifErr } = await supabase
+        .from("notifications")
+        .insert({
+          user_id: session.user.id,
+          announcement_id: ann.id,
+          title: ann.title,
+          message: ann.message,
+          is_read: false,
+        })
+        .select("*")
+        .maybeSingle();
+      if (notifErr && notifErr.code === "23505") {
+        const { data: existing } = await supabase
+          .from("notifications")
+          .select("*")
+          .eq("user_id", session.user.id)
+          .eq("announcement_id", announcementId)
+          .maybeSingle();
+        notification = existing;
+      } else if (!notifErr) {
+        notification = created;
+      }
+    }
+    return { success: true, message: "Marked as seen", notification };
   }
 
   if (m === "GET" && path === "/api/packs/active_packs") {
@@ -361,6 +526,7 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "GET" && path === "/api/games/current-game") {
+    await supabase.rpc("ensure_daily_reset");
     const { data, error } = await supabase.rpc("ensure_current_game");
     if (error) fail(error.message, { data: { message: error.message } });
     return { data: await hydrateGameProducts(data) };
@@ -490,8 +656,12 @@ async function handle(method, url, body, params = {}) {
     const profile = await supabase.rpc("get_full_profile");
     if (profile.error) rpcError(profile.error);
     const dash = await supabase.rpc("admin_dashboard");
-    if (dash.error) rpcError(dash.error);
-    return { data: { ...(profile.data || {}), dashboard: dash.data } };
+    if (dash.error) {
+      const fallback = await buildAdminDashboardFallback();
+      if (!fallback) rpcError(dash.error);
+      return { data: { ...asObject(profile.data), dashboard: fallback } };
+    }
+    return { data: { ...asObject(profile.data), dashboard: asObject(dash.data) } };
   }
 
   if (m === "GET" && path === "/site_admin/users") {
@@ -511,10 +681,58 @@ async function handle(method, url, body, params = {}) {
 
   if (m === "POST" && path === "/auth/invitation-codes/generate-code") {
     const session = await requireSession();
-    const code = `INV${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-    const { error } = await supabase.from("invitation_codes").insert({ code, created_by: session.user.id, reusable: false });
+    let code = "";
+    for (let i = 0; i < 20; i += 1) {
+      code = String(Math.floor(Math.random() * 10000)).padStart(4, "0");
+      if (code === "0000") continue;
+      const { error } = await supabase.from("invitation_codes").insert({ code, created_by: session.user.id, reusable: false });
+      if (!error) return { code };
+      if (error.code !== "23505") rpcError(error);
+    }
+    fail("Could not generate a unique invitation code. Please try again.");
+  }
+
+  if (m === "GET" && path === "/auth/referral-link") {
+    const token = String(params.token || payload.token || "").trim();
+    const { data, error } = await supabase.rpc("peek_referral_token", { p_token: token });
     if (error) rpcError(error);
-    return { code };
+    return data || { valid: false };
+  }
+
+  if (m === "GET" && path === "/site_admin/referrals") {
+    await requireSession();
+    const { data: isAdmin } = await supabase.rpc("is_admin");
+    if (!isAdmin) fail("Not authorized", { status: 403 });
+    const [{ data: links, error: linkErr }, { data: codes, error: codeErr }] = await Promise.all([
+      supabase.from("referral_links").select("*").order("created_at", { ascending: false }),
+      supabase.from("invitation_codes").select("id, code, reusable, used_by, created_at, created_by").order("created_at", { ascending: false }).limit(50),
+    ]);
+    if (linkErr) rpcError(linkErr);
+    if (codeErr) rpcError(codeErr);
+    const usedIds = [...new Set((links || []).map((row) => row.used_by).filter(Boolean))];
+    let names = {};
+    if (usedIds.length) {
+      const { data: profiles } = await supabase.from("profiles").select("id, username").in("id", usedIds);
+      names = Object.fromEntries((profiles || []).map((p) => [p.id, p.username]));
+    }
+    return {
+      links: (links || []).map((row) => ({ ...row, used_username: names[row.used_by] || null })),
+      codes: codes || [],
+    };
+  }
+
+  if (m === "POST" && path === "/site_admin/referrals/special-link") {
+    const session = await requireSession();
+    const { data: isAdmin } = await supabase.rpc("is_admin");
+    if (!isAdmin) fail("Not authorized", { status: 403 });
+    const token = crypto.randomUUID().replace(/-/g, "").slice(0, 12);
+    const { data, error } = await supabase
+      .from("referral_links")
+      .insert({ token, created_by: session.user.id })
+      .select("*")
+      .single();
+    if (error) rpcError(error);
+    return { success: true, link: data };
   }
 
   if (m === "POST" && path === "/site_admin/users/toggle_user_active") {
@@ -563,7 +781,34 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "POST" && path === "/site_admin/users/update-login-password") {
-    fail("Password resets from admin will be added with an Edge Function. For now change the password from the user profile.");
+    const session = await requireSession();
+    const { data: isAdmin, error: adminErr } = await supabase.rpc("is_admin");
+    if (adminErr) rpcError(adminErr);
+    if (!isAdmin) fail("Not authorized", { status: 403 });
+    if (!payload.user_id) fail("User is required");
+    if (!payload.password || String(payload.password).length < 6) fail("Password must be at least 6 characters");
+    if (!payload.admin_password) fail("Administrator password is required");
+    const { data, error } = await supabase.functions.invoke("admin-reset-password", {
+      headers: { Authorization: `Bearer ${session.access_token}` },
+      body: {
+        user_id: payload.user_id,
+        password: payload.password,
+        admin_password: payload.admin_password,
+      },
+    });
+    if (error) {
+      let message = error.message || "Failed to reset password";
+      try {
+        const body = typeof error.context?.json === "function" ? await error.context.json() : null;
+        if (body?.message) message = body.message;
+      } catch {
+        /* ignore */
+      }
+      fail(message);
+    }
+    if (data?.success === false && data?.message) fail(data.message);
+    await logAdmin("Reset user login password");
+    return { success: true, message: data?.message || "Password updated successfully" };
   }
 
   if (m === "POST" && path === "/site_admin/users/update-withdrawal-password") {
@@ -642,6 +887,7 @@ async function handle(method, url, body, params = {}) {
     if (payload.status === "Confirmed" && dep.status !== "Confirmed") {
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", dep.user_id).single();
       await supabase.from("wallets").update({ balance: Number(wallet?.balance || 0) + Number(dep.amount) }).eq("user_id", dep.user_id);
+      await supabase.rpc("sync_vip_from_balance", { p_user_id: dep.user_id });
     }
     await logAdmin(`Deposit ${payload.status}`, payload.admin_password ? "verified" : "");
     return { success: true };

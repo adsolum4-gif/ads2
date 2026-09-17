@@ -1,36 +1,63 @@
-import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { useDispatch } from "react-redux";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
-import { authApi } from "../api/client";
+import { api, authApi } from "../api/client";
 import { Spinner } from "../components/Loader";
 import PasswordInput from "../components/PasswordInput";
+import PhoneCountryInput, { buildInternationalPhone } from "../components/PhoneCountryInput";
+import { loginSuccess, setUserProfile } from "../store/slices/authSlice";
+import { fetchProfileSuccess } from "../store/slices/profileSlice";
+import { fetchNotifications } from "../store/slices/notificationsSlice";
 
 const empty = {
   email: "",
   otp_code: "",
   username: "",
   phone_number: "",
+  country_code: "US",
+  country_dial: "+1",
   password: "",
   confirmPassword: "",
   first_name: "",
   last_name: "",
   gender: "",
   transactional_password: "",
-  invitation_code: "",
+  invitation_code: "0000",
   termsAccepted: false,
 };
 
 export default function SignupOtp() {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const [params] = useSearchParams();
+  const refToken = (params.get("ref") || "").trim();
   const [step, setStep] = useState(1);
-  const [form, setForm] = useState(empty);
+  const [form, setForm] = useState({
+    ...empty,
+    invitation_code: params.get("invite") || params.get("code") || "0000",
+  });
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
+  const [referralOpen, setReferralOpen] = useState(false);
 
   const update = (e) => {
     const { name, value, type, checked } = e.target;
     setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
   };
+
+  useEffect(() => {
+    if (!refToken) return;
+    (async () => {
+      try {
+        const { data } = await api.get("/auth/referral-link/", { params: { token: refToken } });
+        const payload = data?.data || data;
+        setReferralOpen(Boolean(payload?.valid && payload?.unused));
+      } catch {
+        setReferralOpen(false);
+      }
+    })();
+  }, [refToken]);
 
   const sendOtp = async () => {
     if (!form.email) {
@@ -75,27 +102,41 @@ export default function SignupOtp() {
   const complete = async (e) => {
     e.preventDefault();
     if (form.username.length < 3) return toast.error("Username must be at least 3 characters long");
+    const phone = buildInternationalPhone(form.country_dial, form.phone_number);
+    if (!form.country_dial) return toast.error("Please select your country.");
+    if (form.phone_number.replace(/\D/g, "").length < 6) return toast.error("Please enter a valid phone number.");
+    if (!phone) return toast.error("Please enter a valid phone number.");
     if (form.password.length < 6) return toast.error("Password must be at least 6 characters long");
     if (form.password !== form.confirmPassword) return toast.error("Passwords do not match");
     if (form.transactional_password.length !== 4) return toast.error("Transaction password must be exactly 4 digits");
+    if (!referralOpen && !form.invitation_code.trim()) return toast.error("Please enter an invitation code.");
     if (!form.termsAccepted) return toast.error("Please accept the terms and conditions to continue");
     setLoading(true);
     const result = await authApi.signupWithOtp({
       email: form.email,
       otp_code: form.otp_code,
       username: form.username,
-      phone_number: form.phone_number,
+      phone_number: phone,
       password: form.password,
       first_name: form.first_name,
       last_name: form.last_name,
       gender: form.gender,
       transactional_password: form.transactional_password,
-      invitation_code: form.invitation_code,
+      invitation_code: referralOpen ? "0000" : form.invitation_code,
+      referral_token: referralOpen ? refToken : null,
     });
     setLoading(false);
     if (result.success) {
-      toast.success("Registration successful! Email verified.");
-      navigate("/login");
+      if (result.access_token) {
+        dispatch(loginSuccess({ token: result.access_token, refreshToken: result.refresh_token }));
+      }
+      if (result.data) {
+        dispatch(setUserProfile(result.data));
+        dispatch(fetchProfileSuccess(result.data));
+      }
+      dispatch(fetchNotifications());
+      toast.success("Registration successful. Welcome in.");
+      navigate("/home", { replace: true });
     } else toast.error(result.message);
   };
 
@@ -132,7 +173,7 @@ export default function SignupOtp() {
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-gray-600 text-center">
-              We sent a 6-digit code to {form.email}
+              We sent a 6-digit code to {form.email}. Check that inbox. For local testing you can also use 123456.
             </p>
             <input
               type="text"
@@ -162,9 +203,20 @@ export default function SignupOtp() {
               <Field label="Username" required>
                 <input name="username" value={form.username} onChange={update} placeholder="Enter your username" className={inputCls} required />
               </Field>
-              <Field label="Phone Number" required>
-                <input name="phone_number" value={form.phone_number} onChange={update} placeholder="Please enter a valid phone number" className={inputCls} required />
-              </Field>
+              <div className="md:col-span-2">
+                <Field label="Phone Number" required>
+                  <PhoneCountryInput
+                    countryCode={form.country_code}
+                    localNumber={form.phone_number}
+                    onCountryChange={(country) =>
+                      setForm((prev) => ({ ...prev, country_code: country.code, country_dial: country.dial }))
+                    }
+                    onLocalNumberChange={(value) => setForm((prev) => ({ ...prev, phone_number: value }))}
+                    required
+                    className={inputCls}
+                  />
+                </Field>
+              </div>
               <Field label="First Name">
                 <input name="first_name" value={form.first_name} onChange={update} placeholder="Enter your first name" className={inputCls} />
               </Field>
@@ -196,9 +248,17 @@ export default function SignupOtp() {
                 <PasswordInput name="transactional_password" value={form.transactional_password} onChange={update} placeholder="Enter 4-digit code" maxLength={4} className={inputCls} required />
                 <p className="text-gray-500 text-xs mt-1">4-digit numeric code for transactions</p>
               </Field>
-              <Field label="Invitation Code" required>
-                <input name="invitation_code" value={form.invitation_code} onChange={update} placeholder="Enter invitation code" className={inputCls} required />
-                <p className="text-gray-500 text-xs mt-1">Get this from your referrer</p>
+              <Field label="Invitation Code" required={!referralOpen}>
+                {referralOpen ? (
+                  <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                    You are using an admin referral link. You do not need an invitation code. After you register, an invitation code will be sent to your notifications.
+                  </p>
+                ) : (
+                  <>
+                    <input name="invitation_code" value={form.invitation_code} onChange={update} placeholder="0000" className={inputCls} required />
+                    <p className="text-gray-500 text-xs mt-1">Default code is 0000, or use a code from your referrer</p>
+                  </>
+                )}
               </Field>
             </div>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">

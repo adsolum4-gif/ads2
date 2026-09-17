@@ -1,7 +1,12 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 export default function RegisterIntro() {
   const navigate = useNavigate();
+  const [params] = useSearchParams();
+  const start = () => {
+    const qs = params.toString();
+    navigate(qs ? `/signup-otp?${qs}` : "/signup-otp");
+  };
   return (
     <div className="relative flex items-center justify-center min-h-screen overflow-hidden bg-[#0f0a0a]">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(199,8,30,0.28),_transparent_55%),radial-gradient(ellipse_at_bottom,_rgba(80,10,20,0.45),_#0f0a0a)]" />
@@ -31,7 +36,7 @@ export default function RegisterIntro() {
             </div>
           </div>
           <button
-            onClick={() => navigate("/signup-otp")}
+            onClick={start}
             className="w-full bg-red-600 text-white font-semibold py-3.5 rounded-xl hover:bg-red-700 shadow-lg shadow-red-600/25 hover:-translate-y-0.5 transition-all"
           >
             Start registration

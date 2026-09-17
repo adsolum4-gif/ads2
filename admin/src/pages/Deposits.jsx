@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { useAdminLiveRefresh } from "../live";
 
 export default function Deposits() {
   const [loading, setLoading] = useState(true);
@@ -21,17 +22,18 @@ export default function Deposits() {
   const [saving, setSaving] = useState(false);
   const [preview, setPreview] = useState(null);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
       const res = await api.get(endpoints.DEPOSITS);
       const payload = unwrap(res);
       setRows(payload?.results || payload?.data || payload || []);
       setError(false);
-    } catch { setError(true); }
-    finally { setLoading(false); }
+    } catch { if (!silent) setError(true); }
+    finally { if (!silent) setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+  useAdminLiveRefresh(["deposit"], () => load(true));
 
   const save = async () => {
     setSaving(true);

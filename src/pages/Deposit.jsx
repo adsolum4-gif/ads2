@@ -8,6 +8,7 @@ import { Spinner } from "../components/Loader";
 import { fetchDeposits, submitDeposit } from "../store/slices/depositsSlice";
 import { showApiError } from "../api/client";
 import { fadeIn, slideIn } from "../utils/motion";
+import { compressImage, formatFileSize } from "@shared/compressImage";
 
 export default function Deposit() {
   const dispatch = useDispatch();
@@ -18,10 +19,31 @@ export default function Deposit() {
   const [amount, setAmount] = useState("");
   const [confirm, setConfirm] = useState(false);
   const [receipt, setReceipt] = useState(null);
+  const [receiptPreview, setReceiptPreview] = useState(null);
 
   useEffect(() => {
     if (!deposits.length) dispatch(fetchDeposits());
   }, [dispatch, deposits.length]);
+
+  const onReceipt = async (e) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+    if (!String(file.type || "").startsWith("image/")) {
+      toast.error("Please choose a JPG, PNG, or similar image.");
+      return;
+    }
+    try {
+      const compressed = await compressImage(file);
+      setReceipt(compressed);
+      setReceiptPreview(URL.createObjectURL(compressed));
+      if (compressed.size < file.size) {
+        toast.success(`Receipt optimized from ${formatFileSize(file.size)} to ${formatFileSize(compressed.size)}.`);
+      }
+    } catch (err) {
+      toast.error(err.message || "Could not process this image.");
+    }
+  };
 
   const copy = (text) => {
     navigator.clipboard.writeText(text);
@@ -33,15 +55,13 @@ export default function Deposit() {
       toast.error("Amount and receipt are required!");
       return;
     }
-    const form = new FormData();
-    form.append("amount", amount);
-    form.append("screenshot", receipt);
-    const result = await dispatch(submitDeposit(form));
+    const result = await dispatch(submitDeposit({ amount, screenshot: receipt }));
     if (result.success) {
       toast.success("Deposit submitted successfully!");
       setConfirm(false);
       setAmount("");
       setReceipt(null);
+      setReceiptPreview(null);
     } else showApiError(result.message);
   };
 
@@ -68,10 +88,11 @@ export default function Deposit() {
           <div className="border p-4 rounded-lg text-center text-lg font-bold mb-4">Deposit: {amount || "N/A USD"}</div>
           <div className="mb-6">
             <label className="block text-gray-600 font-semibold mb-2">Deposit receipt</label>
-            {receipt && (
-              <img src={typeof receipt === "string" ? receipt : URL.createObjectURL(receipt)} alt="Receipt Preview" className="w-full max-h-64 mb-4 object-cover rounded-lg" />
+            {receiptPreview && (
+              <img src={receiptPreview} alt="Receipt Preview" className="w-full max-h-64 mb-4 object-cover rounded-lg" />
             )}
-            <input type="file" accept="image/*" onChange={(e) => setReceipt(e.target.files[0])} className="block w-full border p-2 rounded-lg" />
+            <input type="file" accept="image/*" onChange={onReceipt} className="block w-full border p-2 rounded-lg" />
+            <p className="text-xs text-gray-400 mt-2">JPG or PNG. Photos larger than 1MB are compressed automatically.</p>
           </div>
           <button onClick={submit} disabled={submitting} className="w-full bg-red-600 text-white py-3 rounded-lg font-semibold hover:bg-red-700 flex justify-center items-center">
             {submitting ? <Spinner /> : "Confirm Deposit"}

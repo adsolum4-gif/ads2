@@ -28,6 +28,8 @@ const sections = [
         "VIP6: Max withdrawal is 150,000 USD",
         "VIP7: Max withdrawal is 300,000 USD",
         "VIP8: Max withdrawal is 500,000 USD",
+        "VIP9: Max withdrawal is 750,000 USD",
+        "VIP10: Max withdrawal is 1,000,000 USD",
       ],
       "After all tasks are completed, users can apply for a full withdrawal.",
       "Withdrawals cannot be requested without task completion.",
@@ -49,7 +51,7 @@ const sections = [
     icon: FaBox,
     color: "text-yellow-500",
     title: "V. Normal Products",
-    items: ["Normal and combined earnings vary based on user type (VIP1 to VIP8).", "VIP1: 0.5% profit on normal products; higher tiers earn more.", "Funds and earnings are credited after each completed task."],
+    items: ["Normal and combined earnings vary based on user type (VIP1 to VIP10).", "VIP1: 0.5% profit on normal products; higher tiers earn more.", "Funds and earnings are credited after each completed task."],
   },
   {
     icon: FaLayerGroup,

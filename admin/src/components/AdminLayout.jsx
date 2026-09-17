@@ -6,11 +6,21 @@ import { MdMenu, MdNotifications, MdExpandMore, MdPerson, MdLogout, MdRefresh } 
 import { IoMdNotifications } from "react-icons/io";
 import { CircularProgress } from "@mui/material";
 import Sidebar from "./Sidebar";
+import { AdminLiveProvider, useAdminLive } from "../live";
 import { clearUser, toggleSidebar } from "../store";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
+import { supabase } from "@shared/supabase";
 
 export default function AdminLayout() {
+  return (
+    <AdminLiveProvider>
+      <AdminShell />
+    </AdminLiveProvider>
+  );
+}
+
+function AdminShell() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const collapsed = useSelector((s) => s.userSlice.sidebarCollapsed);
@@ -21,6 +31,17 @@ export default function AdminLayout() {
   const [notifs, setNotifs] = useState([]);
   const [marking, setMarking] = useState(false);
   const [admin, setAdmin] = useState(user);
+  const live = useAdminLive();
+
+  const loadNotifs = async () => {
+    try {
+      const { data } = await api.get(endpoints.NOTIFICATIONS);
+      const list = unwrap({ data });
+      setNotifs(Array.isArray(list) ? list : list?.results || list?.data || []);
+    } catch {
+      setNotifs([]);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -35,15 +56,10 @@ export default function AdminLayout() {
     loadNotifs();
   }, []);
 
-  const loadNotifs = async () => {
-    try {
-      const { data } = await api.get(endpoints.NOTIFICATIONS);
-      const list = unwrap({ data });
-      setNotifs(Array.isArray(list) ? list : list?.results || list?.data || []);
-    } catch {
-      setNotifs([]);
-    }
-  };
+  useEffect(() => {
+    if (!live.version) return;
+    loadNotifs();
+  }, [live.version]);
 
   const unread = notifs.filter((n) => !n.is_read).length;
 
@@ -59,18 +75,19 @@ export default function AdminLayout() {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut().catch(() => {});
     dispatch(clearUser());
-    navigate("/");
+    navigate("/admin");
   };
 
   return (
-    <div className="flex h-screen overflow-hidden bg-gray-100">
+    <div className="flex h-screen overflow-hidden bg-[#f6f3f4]">
       <div className={`${mobileOpen ? "fixed inset-y-0 left-0 z-50 md:static" : "hidden md:block"}`}>
         <Sidebar isCollapsed={collapsed} closeSidebar={() => setMobileOpen(false)} />
       </div>
       <div className="flex flex-col flex-1 min-w-0">
-        <header className="flex items-center justify-between h-16 px-4 bg-white shadow">
+        <header className="flex items-center justify-between h-16 px-4 bg-white border-b border-gray-100 shadow-sm">
           <button onClick={() => dispatch(toggleSidebar())} className="hidden text-2xl text-gray-600 md:block">
             <MdMenu />
           </button>
@@ -139,7 +156,7 @@ export default function AdminLayout() {
                   <button
                     onClick={() => {
                       setMenuOpen(false);
-                      navigate("/home/profile");
+                      navigate("/admin/home/profile");
                     }}
                     className="flex items-center w-full px-4 py-2 space-x-2 text-left text-gray-700 hover:bg-gray-100"
                   >
@@ -156,7 +173,7 @@ export default function AdminLayout() {
             </div>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto bg-gray-100 md:p-4">
+        <div className="flex-1 overflow-y-auto bg-[#f6f3f4] md:p-4">
           <Outlet />
         </div>
       </div>

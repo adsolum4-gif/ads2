@@ -7,8 +7,14 @@ const notificationsSlice = createSlice({
   initialState: { notifications: [], isLoading: false },
   reducers: {
     setNotifications(state, action) {
-      state.notifications = action.payload || [];
+      state.notifications = Array.isArray(action.payload) ? action.payload : [];
       state.isLoading = false;
+    },
+    prependNotification(state, action) {
+      const item = action.payload;
+      if (!item?.id) return;
+      if (state.notifications.some((n) => n.id === item.id)) return;
+      state.notifications = [item, ...state.notifications];
     },
     setLoading(state, action) {
       state.isLoading = action.payload;
@@ -16,17 +22,20 @@ const notificationsSlice = createSlice({
   },
 });
 
-export const { setNotifications, setLoading } = notificationsSlice.actions;
+export const { setNotifications, prependNotification, setLoading } = notificationsSlice.actions;
 
-export const fetchNotifications = () => async (dispatch) => {
-  dispatch(setLoading(true));
-  try {
-    const { data } = await api.get("/api/notifications/");
-    dispatch(setNotifications(data.data || data));
-  } catch {
-    dispatch(setNotifications([]));
-  }
-};
+export const fetchNotifications =
+  (silent = false) =>
+  async (dispatch) => {
+    if (!silent) dispatch(setLoading(true));
+    try {
+      const { data } = await api.get("/api/notifications/");
+      const list = data.data || data.results || data;
+      dispatch(setNotifications(Array.isArray(list) ? list : []));
+    } catch {
+      if (!silent) dispatch(setNotifications([]));
+    }
+  };
 
 export const markNotificationRead = (id) => async (dispatch, getState) => {
   try {

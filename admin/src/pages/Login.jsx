@@ -39,7 +39,7 @@ export default function Login() {
             ...payload,
           })
         );
-        navigate("/home");
+        navigate("/admin/home");
       }, 2000);
     } catch (err) {
       showError(err, "Login failed. Please try again.");

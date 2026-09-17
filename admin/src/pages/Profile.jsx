@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar } from "../components/PageHeader";
+import { compressImage } from "@shared/compressImage";
 
 export default function Profile() {
   const [loading, setLoading] = useState(true);
@@ -24,10 +25,19 @@ export default function Profile() {
   const save = async () => {
     setSaving(true);
     try {
-      const body = new FormData();
-      ["username", "first_name", "last_name", "phone_number", "email"].forEach((k) => form[k] != null && body.append(k, form[k]));
-      if (form.profile_picture instanceof File) body.append("profile_picture", form.profile_picture);
-      await api.patch(endpoints.PATCH_PROFILE, body);
+      const payload = {
+        username: form.username,
+        first_name: form.first_name,
+        last_name: form.last_name,
+        phone_number: form.phone_number,
+        email: form.email,
+      };
+      if (form.profile_picture instanceof Blob) {
+        payload.profile_picture = await compressImage(form.profile_picture);
+      }
+      const res = await api.patch(endpoints.PATCH_PROFILE, payload);
+      const updated = unwrap(res);
+      if (updated) setForm(updated);
       toast.success("Profile updated successfully");
     } catch (e) { showError(e); }
     finally { setSaving(false); }

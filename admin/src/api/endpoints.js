@@ -22,6 +22,8 @@ export const endpoints = {
   PRODUCT: (id) => `/api/products/${id}/`,
   USERS: "/site_admin/users/",
   GENERATE_CODE: "/auth/invitation-codes/generate-code/",
+  REFERRALS: "/site_admin/referrals/",
+  SPECIAL_LINK: "/site_admin/referrals/special-link/",
   UPDATE_LOGIN_PASSWORD: "/site_admin/users/update-login-password/",
   UPDATE_WITHDRAWAL_PASSWORD: "/site_admin/users/update-withdrawal-password/",
   UPDATE_BALANCE: "/site_admin/users/update-balance/",

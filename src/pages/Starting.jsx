@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
@@ -7,6 +7,7 @@ import { FaUserCircle, FaStar, FaTimes } from "react-icons/fa";
 import BottomNav from "../components/BottomNav";
 import ProductImage from "../components/ProductImage";
 import VipBadge from "../components/VipBadge";
+import DailyResetBanner from "../components/DailyResetBanner";
 import { OvalLoader, Spinner } from "../components/Loader";
 import { authApi, showApiError } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure } from "../store/slices/profileSlice";
@@ -40,21 +41,24 @@ export default function Starting() {
 
   useEffect(() => {
     (async () => {
-      if (!user) {
-        dispatch(fetchProfileStart());
-        const result = await authApi.fetchProfile();
-        if (result.success) dispatch(fetchProfileSuccess(result.data));
-        else {
-          dispatch(fetchProfileFailure(result.message));
-          toast.error(result.message || "Failed to load profile.");
-        }
+      dispatch(fetchProfileStart());
+      const result = await authApi.fetchProfile();
+      if (result.success) dispatch(fetchProfileSuccess(result.data));
+      else if (!user) {
+        dispatch(fetchProfileFailure(result.message));
+        toast.error(result.message || "Failed to load profile.");
       }
     })();
-  }, [dispatch, user]);
+  }, [dispatch]);
 
   useEffect(() => {
     if (!products?.length) dispatch(fetchProducts());
   }, [dispatch, products]);
+
+  const refreshProfile = useCallback(async () => {
+    const result = await authApi.fetchProfile();
+    if (result.success) dispatch(fetchProfileSuccess(result.data));
+  }, [dispatch]);
 
   const slides = products?.length ? chunk(products, 7) : [[]];
 
@@ -169,13 +173,15 @@ export default function Starting() {
             <h2 className="text-2xl font-bold text-gray-800">Start Optimization</h2>
             <p className="text-sm text-gray-500 mt-1">Review and submit tasks</p>
           </div>
-          <div className="bg-red-50 px-4 py-2 rounded-xl">
+          <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
+            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
             <p className="text-red-600 text-xl font-bold">
               {user?.current_number_count || 0} / {user?.total_number_can_play || 0}
             </p>
           </div>
         </div>
-        <div className="relative flex justify-center items-center w-full">
+        <DailyResetBanner onReset={refreshProfile} />
+        <div className="relative flex justify-center items-center w-full mt-5">
           <button onClick={() => setPage((p) => (p - 1 + slides.length) % Math.max(slides.length, 1))} className="absolute left-0 bg-white hover:bg-gray-50 p-3 rounded-full z-10 shadow-md border border-gray-200">
             ❮
           </button>

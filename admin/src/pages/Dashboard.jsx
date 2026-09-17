@@ -13,11 +13,24 @@ import {
   TextField,
 } from "@mui/material";
 import { format } from "date-fns";
-import { api, unwrap } from "../api/client";
+import { useDispatch } from "react-redux";
+import { useNavigate } from "react-router-dom";
+import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { clearUser } from "../store";
+import { useAdminLiveRefresh } from "../live";
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+function monthValues(obj) {
+  const source = obj && typeof obj === "object" ? obj : {};
+  return MONTHS.map((month) => Number(source[month] ?? 0));
+}
 
 export default function Dashboard() {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [data, setData] = useState(null);
@@ -26,26 +39,37 @@ export default function Dashboard() {
   const [rows, setRows] = useState(5);
   const [sort, setSort] = useState({ key: "id", direction: "asc" });
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     setError(false);
     try {
       const res = await api.get(endpoints.GET_ADMIN);
       const payload = unwrap(res);
-      setData(payload?.dashboard || payload);
-    } catch {
-      setError(true);
+      const dashboard = payload?.dashboard || payload || {};
+      setData(typeof dashboard === "string" ? JSON.parse(dashboard) : dashboard);
+    } catch (err) {
+      if (err?.response?.status === 401) {
+        dispatch(clearUser());
+        navigate("/admin", { replace: true });
+        return;
+      }
+      if (!silent) {
+        showError(err, "Could not load dashboard data.");
+        setError(true);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
   useEffect(() => {
     load();
   }, []);
+  useAdminLiveRefresh(["user", "deposit"], () => load(true));
 
   const users = useMemo(() => {
     const list = data?.total_users_login_today?.users || [];
+    if (!Array.isArray(list)) return [];
     return list.map((u, i) => ({
       ...u,
       id: i + 1,
@@ -73,12 +97,12 @@ export default function Dashboard() {
     { title: "Total User Logins Today", value: data?.total_users_login_today?.count, icon: "🔑" },
   ];
 
-  const userSeries = [{ name: "Users", data: Object.values(data?.user_registrations_per_month || {}) }];
-  const subSeries = [{ name: "Submissions", data: Object.values(data?.total_submissions_per_month || {}) }];
+  const userSeries = [{ name: "Users", data: monthValues(data?.user_registrations_per_month) }];
+  const subSeries = [{ name: "Submissions", data: monthValues(data?.total_submissions_per_month) }];
   const chartOpts = {
-    chart: { id: "users-chart-static" },
+    chart: { id: "users-chart-static", toolbar: { show: false } },
     colors: ["#1E3A8A"],
-    xaxis: { categories: ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] },
+    xaxis: { categories: MONTHS },
   };
 
   if (loading) return <LoadingBar />;

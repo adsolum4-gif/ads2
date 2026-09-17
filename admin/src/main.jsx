@@ -4,7 +4,10 @@ import { Provider } from "react-redux";
 import { CssBaseline, ThemeProvider, createTheme } from "@mui/material";
 import App from "./App";
 import { store } from "./store";
+import { restoreAdminSession } from "./api/client";
 import "./index.css";
+
+restoreAdminSession();
 
 const theme = createTheme({
   palette: {

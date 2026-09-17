@@ -25,9 +25,24 @@ export async function restoreAdminSession() {
     localStorage.setItem(
       "adminUser",
       JSON.stringify({
+        ...(JSON.parse(localStorage.getItem("adminUser") || "{}") || {}),
         access_token: data.session.access_token,
         refresh_token: data.session.refresh_token,
       })
     );
+    return data.session;
   }
+  try {
+    const stored = JSON.parse(localStorage.getItem("adminUser") || "null");
+    if (stored?.access_token && stored?.refresh_token) {
+      const restored = await supabase.auth.setSession({
+        access_token: stored.access_token,
+        refresh_token: stored.refresh_token,
+      });
+      return restored.data.session || null;
+    }
+  } catch {
+    return null;
+  }
+  return null;
 }
