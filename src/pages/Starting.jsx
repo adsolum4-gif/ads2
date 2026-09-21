@@ -2,7 +2,6 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
-import Swal from "sweetalert2";
 import { FaUserCircle, FaStar, FaTimes } from "react-icons/fa";
 import BottomNav from "../components/BottomNav";
 import ProductImage from "../components/ProductImage";
@@ -86,15 +85,6 @@ export default function Starting() {
       toast.error("No task is available right now.");
       return;
     }
-    if (game.special_product) {
-      Swal.fire({
-        title: "Congratulations! You got a special product!",
-        text: "This submission contains a special product. Enjoy a higher commission.",
-        icon: "success",
-        confirmButtonText: "OK",
-        customClass: { popup: "custom-swal-mobile-size" },
-      });
-    }
     setRating(0);
     setComment("");
     setOpen(true);
@@ -124,10 +114,10 @@ export default function Starting() {
   };
 
   const stats = [
-    { label: "Wallet Balance", amount: `$${money(user?.wallet?.balance)}`, description: "Profits will be added here" },
-    { label: "Today's Profit", amount: `$${money(user?.today_profit)}`, description: "Profit earned" },
-    { label: "On Hold", amount: `$${money(user?.wallet?.on_hold)}`, description: "Will be added to your balance" },
-    { label: "Salary", amount: `$${money(user?.wallet?.salary)}`, description: "Today's salary" },
+    { label: "Wallet Balance", amount: `$${money(user?.wallet?.balance)}`, description: "Does not reset after 24 hours" },
+    { label: "Today's Profit", amount: `$${money(user?.today_profit)}`, description: "Resets after 24 hours" },
+    { label: "On Hold", amount: `$${money(user?.wallet?.on_hold)}`, description: Number(user?.wallet?.on_hold) < 0 ? "Negative amount held on this account" : "Will be added to your balance" },
+    { label: "Salary", amount: `$${money(user?.wallet?.salary)}`, description: "Accumulated from completed tasks" },
   ];
 
   return (
@@ -283,11 +273,6 @@ export default function Starting() {
                   <span className="text-[11px] font-semibold uppercase tracking-wider bg-white/12 border border-white/15 rounded-full px-3 py-1">
                     Randomized set
                   </span>
-                  {currentGame.special_product && (
-                    <span className="text-[11px] font-semibold uppercase tracking-wider bg-amber-300/95 text-amber-950 rounded-full px-3 py-1">
-                      Special product
-                    </span>
-                  )}
                 </div>
               </div>
 

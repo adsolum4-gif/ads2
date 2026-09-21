@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { useAdminLiveRefresh } from "../live";
 
 export default function Withdrawals() {
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,7 @@ export default function Withdrawals() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
+  useAdminLiveRefresh(["user"], () => load());
 
   const save = async () => {
     setSaving(true);

@@ -7,27 +7,50 @@ import { toast } from "sonner";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { useAdminLiveRefresh } from "../live";
+
+function money(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n.toFixed(2) : "0.00";
+}
 
 export default function Holds() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [rows, setRows] = useState([]);
+  const [users, setUsers] = useState([]);
   const [open, setOpen] = useState(false);
   const [current, setCurrent] = useState(null);
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
 
-  const load = async () => {
-    setLoading(true);
+  const load = async (silent = false) => {
+    if (!silent) setLoading(true);
     try {
-      const res = await api.get(endpoints.ON_HOLDS);
-      const payload = unwrap(res);
-      setRows(payload?.results || payload?.data || payload || []);
+      const [rangesRes, holdsRes] = await Promise.all([
+        api.get(endpoints.ON_HOLDS),
+        api.get(endpoints.USER_HOLDS),
+      ]);
+      const rangesPayload = unwrap(rangesRes);
+      const ranges = rangesPayload?.results
+        || (Array.isArray(rangesPayload?.data) ? [] : rangesPayload?.data?.results)
+        || [];
+      setRows(Array.isArray(ranges) ? ranges : []);
+
+      const holdsPayload = unwrap(holdsRes);
+      const list = Array.isArray(holdsPayload)
+        ? holdsPayload
+        : holdsPayload?.users || holdsPayload?.results || holdsPayload?.data || [];
+      setUsers(Array.isArray(list) ? list : []);
       setError(false);
-    } catch { setError(true); }
-    finally { setLoading(false); }
+    } catch {
+      if (!silent) setError(true);
+    } finally {
+      if (!silent) setLoading(false);
+    }
   };
   useEffect(() => { load(); }, []);
+  useAdminLiveRefresh(["user", "hold"], () => load(true));
 
   const save = async () => {
     setSaving(true);
@@ -59,7 +82,44 @@ export default function Holds() {
 
   return (
     <div className="p-2 md:p-6">
-      <PageHeader title="Ranges of on hold" />
+      <PageHeader title="On hold" />
+
+      <h3 className="mb-3 text-lg font-semibold text-gray-800">User on hold</h3>
+      <p className="mb-3 text-sm text-gray-500">
+        Same on-hold amount each user sees on Starting. Use this to track what they actually see.
+      </p>
+      <TableContainer component={Paper}>
+        <Table>
+          <TableHead>
+            <TableRow>
+              {["#", "Username", "Balance", "On hold"].map((h) => (
+                <TableCell key={h}>{h}</TableCell>
+              ))}
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            {users.length === 0 && (
+              <TableRow>
+                <TableCell colSpan={4} sx={{ color: "text.secondary" }}>
+                  No users currently have an on-hold amount.
+                </TableCell>
+              </TableRow>
+            )}
+            {users.map((u, i) => (
+              <TableRow key={u.user_id}>
+                <TableCell>{i + 1}</TableCell>
+                <TableCell>{u.username}</TableCell>
+                <TableCell>${money(u.balance)}</TableCell>
+                <TableCell sx={{ color: Number(u.on_hold) < 0 ? "#d32f2f" : "inherit", fontWeight: 600 }}>
+                  ${money(u.on_hold)}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </TableContainer>
+
+      <h3 className="mt-10 mb-3 text-lg font-semibold text-gray-800">Ranges of on hold</h3>
       <Button variant="contained" color="success" className="mb-4" onClick={() => { setCurrent(null); setForm({ is_active: true }); setOpen(true); }}>Add a range of on hold</Button>
       <TableContainer component={Paper} className="mt-4">
         <Table>

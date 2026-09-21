@@ -55,6 +55,9 @@ export function AdminLiveProvider({ children }) {
           emit("user", payload.new, "INSERT");
           toast.info(`New user: ${payload.new?.username || "registered"}`);
         })
+        .on("postgres_changes", { event: "*", schema: "public", table: "wallets" }, (payload) => {
+          emit("hold", payload.new || payload.old, payload.eventType);
+        })
         .on("postgres_changes", { event: "*", schema: "public", table: "deposits" }, (payload) => {
           emit("deposit", payload.new || payload.old, payload.eventType);
           if (payload.eventType === "INSERT") {

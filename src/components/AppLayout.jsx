@@ -9,6 +9,7 @@ import { announcementApi, authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess } from "../store/slices/profileSlice";
 import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
 import { supabase } from "@shared/supabase";
+import { toast } from "sonner";
 
 export default function AppLayout() {
   const navigate = useNavigate();
@@ -49,15 +50,20 @@ export default function AppLayout() {
       .on("postgres_changes", { event: "*", schema: "public", table: "announcements" }, (payload) => {
         if (payload.new?.is_active) openIfUnseen();
       })
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, () => {
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "notifications" }, (payload) => {
+        const row = payload.new;
+        if (row?.user_id && user?.id && row.user_id !== user.id) return;
         dispatch(fetchNotifications(true));
+        if (row?.title === "Deposit confirmed") {
+          toast.success(row.message || "Your deposit has been confirmed.");
+        }
       })
       .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [dispatch]);
+  }, [dispatch, user?.id]);
 
   const closeAnnouncement = async () => {
     const current = announcement;

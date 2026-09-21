@@ -52,6 +52,7 @@ export default function AllUsers() {
   const [form, setForm] = useState({});
   const [saving, setSaving] = useState(false);
   const [info, setInfo] = useState(null);
+  const [packs, setPacks] = useState([]);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
@@ -74,6 +75,13 @@ export default function AllUsers() {
   useEffect(() => {
     load();
   }, [page, rows, order]);
+  useEffect(() => {
+    api.get(endpoints.PACKS).then((res) => {
+      const payload = unwrap(res);
+      const list = payload?.results || payload?.data || payload || [];
+      setPacks(Array.isArray(list) ? list : []);
+    }).catch(() => {});
+  }, []);
   useAdminLiveRefresh(["user"], () => load(true));
 
   const cols = useMemo(
@@ -85,6 +93,7 @@ export default function AllUsers() {
       { Header: "Phone No", accessorKey: "phone_number" },
       { Header: "Gender", accessorKey: "gender" },
       { Header: "Balance", accessorKey: "balance" },
+      { Header: "On hold", accessorKey: "onHold" },
       { Header: "Actions", accessorKey: "actions" },
     ],
     []
@@ -93,6 +102,7 @@ export default function AllUsers() {
   const rowsView = users.map((u) => ({
     ...u,
     balance: u.wallet?.balance,
+    onHold: u.wallet?.on_hold,
     gender: u.gender === "M" ? "Male" : u.gender === "F" ? "Female" : u.gender,
   }));
 
@@ -166,7 +176,9 @@ export default function AllUsers() {
             <MenuItem value="-total_negative_product">Total negative products descending</MenuItem>
           </Select>
         </FormControl>
-        <Button className="h-10" variant="contained" color="warning" size="small" onClick={exportCsv}>Export CSV</Button>
+        <Button className="h-10" variant="contained" color="success" size="small" onClick={() => { setDialog("create"); setForm({ gender: "M", password: "Team@123" }); }}>
+          Add user
+        </Button>
         <Button className="h-10" variant="contained" color="error" size="small" onClick={() => window.print()}>Export PDF</Button>
         <Button className="h-10 mr-4" variant="contained" color="info" size="small" onClick={(e) => setColAnchor(e.currentTarget)}>Column Visibility</Button>
         <Menu anchorEl={colAnchor} open={!!colAnchor} onClose={() => setColAnchor(null)}>
@@ -220,12 +232,17 @@ export default function AllUsers() {
                   {!hidden.includes("phone_number") && <TableCell>{u.phone_number}</TableCell>}
                   {!hidden.includes("gender") && <TableCell>{u.gender}</TableCell>}
                   {!hidden.includes("balance") && <TableCell>{u.balance}</TableCell>}
+                  {!hidden.includes("onHold") && (
+                    <TableCell sx={{ color: Number(u.onHold) < 0 ? "#d32f2f" : "inherit", fontWeight: Number(u.onHold) !== 0 ? 600 : 400 }}>
+                      ${Number(u.onHold || 0).toFixed(2)}
+                    </TableCell>
+                  )}
                   <TableCell>
                     <Button size="small" variant="contained" color="secondary" onClick={(e) => openMenu(e, u)}>Unroll</Button>
                   </TableCell>
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={8} style={{ padding: 0 }}>
+                  <TableCell colSpan={9} style={{ padding: 0 }}>
                     <Collapse in={!!expanded[u.id]}>
                       <div className="p-4">
                         <p><strong>Total products submitted:</strong> {u.total_product_submitted ?? u.total_games_played}</p>
@@ -234,6 +251,7 @@ export default function AllUsers() {
                         <p><strong>On hold:</strong> {u.wallet?.on_hold}</p>
                         <p><strong>Salary:</strong> {u.wallet?.salary}</p>
                         <p><strong>Level:</strong> {u.wallet?.package?.name}</p>
+                        <p><strong>Missions:</strong> {u.current_number_count ?? 0} / {u.total_number_can_play ?? 0}</p>
                         <p><strong>Last connection:</strong> {u.last_connection ? format(new Date(u.last_connection), "dd MMM yyyy h:mm a") : "N/A"}</p>
                         <p className="flex items-center gap-2">
                           <strong>Active:</strong>
@@ -251,11 +269,14 @@ export default function AllUsers() {
       </TableContainer>
 
       <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
+        <MenuItem onClick={() => { setDialog("package"); setForm({ package_id: current?.wallet?.package?.id || current?.wallet?.package_id || "" }); setMenu(null); }}>Assign VIP level</MenuItem>
+        <MenuItem onClick={() => { setDialog("missions"); setForm({ total_number_can_play: current?.total_number_can_play, current_number_count: current?.current_number_count }); setMenu(null); }}>Update missions</MenuItem>
+        <MenuItem onClick={() => { setDialog("hold"); setForm({ amount: current?.wallet?.on_hold }); setMenu(null); }}>Update on hold</MenuItem>
         <MenuItem onClick={() => { setDialog("login"); setForm({}); setMenu(null); }}>Reset login password</MenuItem>
         <MenuItem onClick={() => { setDialog("withdraw"); setForm({}); setMenu(null); }}>Update withdrawal password</MenuItem>
         <MenuItem onClick={() => { setDialog("balance"); setForm({}); setMenu(null); }}>Update customer balance</MenuItem>
         <MenuItem onClick={() => { setDialog("profit"); setForm({}); setMenu(null); }}>Update Today’s profit</MenuItem>
-        <MenuItem onClick={() => { setDialog("salary"); setForm({}); setMenu(null); }}>Update Today’s salary</MenuItem>
+        <MenuItem onClick={() => { setDialog("salary"); setForm({}); setMenu(null); }}>Update salary</MenuItem>
         <MenuItem onClick={() => { setDialog("credit"); setForm({ credit_score: current?.wallet?.credit_score }); setMenu(null); }}>Update Credit Score</MenuItem>
         <MenuItem onClick={() => { setDialog("reset"); setMenu(null); }}>Reset account to start a new task</MenuItem>
         <MenuItem onClick={async () => {
@@ -273,6 +294,50 @@ export default function AllUsers() {
         </MenuItem>
         <MenuItem sx={{ color: "error.main" }} onClick={() => { setDialog("delete"); setMenu(null); }}>Delete User</MenuItem>
       </Menu>
+
+      <ActionDialog open={dialog === "create"} title="Add user (no email required)" onClose={() => setDialog(null)} saving={saving} saveLabel={saving ? "Creating..." : "Create user"} onSave={() => {
+        if (!form.username || !form.email || !form.password) return toast.error("Username, email, and password are required");
+        postAction(endpoints.CREATE_USER, {
+          username: form.username,
+          email: form.email,
+          password: form.password,
+          first_name: form.first_name,
+          last_name: form.last_name,
+          phone_number: form.phone_number,
+          gender: form.gender,
+        });
+      }}>
+        <TextField label="Username" fullWidth value={form.username || ""} onChange={(e) => setForm({ ...form, username: e.target.value })} />
+        <TextField label="Email" fullWidth value={form.email || ""} onChange={(e) => setForm({ ...form, email: e.target.value })} />
+        <TextField label="Password" type="password" fullWidth value={form.password || ""} onChange={(e) => setForm({ ...form, password: e.target.value })} />
+        <TextField label="First name" fullWidth value={form.first_name || ""} onChange={(e) => setForm({ ...form, first_name: e.target.value })} />
+        <TextField label="Last name" fullWidth value={form.last_name || ""} onChange={(e) => setForm({ ...form, last_name: e.target.value })} />
+        <TextField label="Phone" fullWidth value={form.phone_number || ""} onChange={(e) => setForm({ ...form, phone_number: e.target.value })} />
+        <TextField select fullWidth label="Gender" value={form.gender || "M"} onChange={(e) => setForm({ ...form, gender: e.target.value })}>
+          <MenuItem value="M">Male</MenuItem>
+          <MenuItem value="F">Female</MenuItem>
+        </TextField>
+      </ActionDialog>
+
+      <ActionDialog open={dialog === "package"} title="Assign VIP level" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_PACKAGE, { user_id: current.id, package_id: form.package_id })}>
+        <TextField label="User" fullWidth disabled value={current?.username || ""} />
+        <TextField select fullWidth label="VIP pack" value={form.package_id || ""} onChange={(e) => setForm({ ...form, package_id: e.target.value })}>
+          {packs.map((p) => (
+            <MenuItem key={p.id} value={p.id}>{p.name} — ${p.usd_value}</MenuItem>
+          ))}
+        </TextField>
+      </ActionDialog>
+
+      <ActionDialog open={dialog === "missions"} title="Update missions" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_MISSIONS, { user_id: current.id, total_number_can_play: form.total_number_can_play, current_number_count: form.current_number_count })}>
+        <TextField label="Completed today" type="number" fullWidth value={form.current_number_count ?? ""} onChange={(e) => setForm({ ...form, current_number_count: e.target.value })} />
+        <TextField label="Daily mission limit" type="number" fullWidth value={form.total_number_can_play ?? ""} onChange={(e) => setForm({ ...form, total_number_can_play: e.target.value })} />
+      </ActionDialog>
+
+      <ActionDialog open={dialog === "hold"} title="Update on hold" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_ON_HOLD, { user_id: current.id, amount: form.amount, reason: form.reason })}>
+        <TextField label="Current on hold" fullWidth disabled value={current?.wallet?.on_hold ?? ""} />
+        <TextField label="Amount" type="number" fullWidth value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
+        <TextField label="Reason" fullWidth value={form.reason || ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
+      </ActionDialog>
 
       <ActionDialog open={dialog === "login"} title="Reset Login Password" onClose={() => setDialog(null)} saving={saving} saveLabel={saving ? "Resetting..." : "Reset password"} onSave={() => {
         if (!form.password || !form.confirm) return toast.error("Enter and confirm the new password");
@@ -308,8 +373,8 @@ export default function AllUsers() {
         <TextField label="Administrator password" type="password" fullWidth value={form.admin_password || ""} onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
       </ActionDialog>
 
-      <ActionDialog open={dialog === "salary"} title="Update Customer Today’s salary" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_SALARY, { user_id: current.id, amount: form.amount, reason: form.reason, admin_password: form.admin_password })}>
-        <TextField label="Current Customer Today’s salary" fullWidth disabled value={current?.wallet?.salary ?? ""} />
+      <ActionDialog open={dialog === "salary"} title="Update customer salary" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_SALARY, { user_id: current.id, amount: form.amount, reason: form.reason, admin_password: form.admin_password })}>
+        <TextField label="Current salary" fullWidth disabled value={current?.wallet?.salary ?? ""} />
         <TextField label="Amount" type="number" fullWidth value={form.amount || ""} onChange={(e) => setForm({ ...form, amount: e.target.value })} />
         <TextField label="Reason for change" fullWidth value={form.reason || ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} />
         <TextField label="Administrator password" type="password" fullWidth value={form.admin_password || ""} onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
@@ -344,6 +409,9 @@ export default function AllUsers() {
               <p><strong>Exchange:</strong> {info.exchange}</p>
               <p><strong>Email address:</strong> {info.email}</p>
               <p><strong>Referral Code:</strong> {info.referral_code}</p>
+              <p><strong>VIP:</strong> {info.package_name || "N/A"}</p>
+              <p><strong>Balance:</strong> {info.balance}</p>
+              <p><strong>Missions:</strong> {info.current_number_count ?? 0} / {info.total_number_can_play ?? 0}</p>
             </div>
           )}
         </DialogContent>

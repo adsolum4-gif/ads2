@@ -40,7 +40,7 @@ export default function DailyResetBanner({ onReset }) {
         This activity will reset in {remaining.hours} hrs, {remaining.minutes} min, and {remaining.seconds} sec
       </p>
       <p className="text-xs text-amber-900 mt-1">
-        Finish today&apos;s progress before it resets at 12:00 AM. Your optimization count goes back to 0 each new day.
+        Mission count and today&apos;s profit reset at 12:00 AM. Wallet balance and salary keep accumulating.
       </p>
     </div>
   );

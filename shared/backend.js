@@ -90,6 +90,13 @@ async function requireSession() {
   return data.session;
 }
 
+async function requireAdmin() {
+  await requireSession();
+  const { data, error } = await supabase.rpc("is_admin");
+  if (error) rpcError(error);
+  if (!data) fail("Not authorized", { status: 403 });
+}
+
 const EMPTY_MONTHS = {
   Jan: 0, Feb: 0, Mar: 0, Apr: 0, May: 0, Jun: 0,
   Jul: 0, Aug: 0, Sep: 0, Oct: 0, Nov: 0, Dec: 0,
@@ -186,6 +193,7 @@ function mapUser(row) {
     ...row,
     wallet,
     balance: wallet.balance,
+    on_hold: wallet.on_hold,
     active: row.is_active,
     total_product_submitted: row.total_games_played,
     total_games_played: row.total_games_played,
@@ -249,23 +257,25 @@ async function handle(method, url, body, params = {}) {
   if (m === "POST" && path === "/auth/send_otp") {
     const email = String(payload.email || "").trim().toLowerCase();
     if (!email) fail("Please enter your email address.");
-    const { data, error } = await supabase.functions.invoke("send-otp", { body: { email } });
-    if (error) {
-      let message = error.message || "Failed to send OTP.";
-      try {
-        const body = typeof error.context?.json === "function" ? await error.context.json() : data;
-        if (body?.message) message = body.message;
-      } catch {
-        if (data?.message) message = data.message;
-      }
-      fail(message);
-    }
-    if (data?.success === false) fail(data.message || "Failed to send OTP.");
-    return {
+    const testing = {
       success: true,
-      message: data?.message || "OTP sent.",
-      emailed: Boolean(data?.emailed),
+      emailed: false,
+      message: "Email sending needs a domain. For testing, enter 123456.",
     };
+    try {
+      const { data, error } = await supabase.functions.invoke("send-otp", { body: { email } });
+      if (error || data?.success === false) return testing;
+      if (data?.emailed) {
+        return {
+          success: true,
+          emailed: true,
+          message: data.message || "OTP sent. If it does not arrive, enter 123456.",
+        };
+      }
+      return testing;
+    } catch {
+      return testing;
+    }
   }
 
   if (m === "POST" && path === "/auth/verify_otp") {
@@ -745,11 +755,12 @@ async function handle(method, url, body, params = {}) {
   if (m === "POST" && path === "/site_admin/users/get_user_info") {
     const { data, error } = await supabase
       .from("profiles")
-      .select("*, payments(wallet, exchange), wallets(trc_address)")
+      .select("*, payments(wallet, exchange), wallets(trc_address, balance, on_hold, package_id, packs(name, usd_value))")
       .eq("id", payload.user_id)
       .single();
     if (error) rpcError(error);
     const pay = Array.isArray(data.payments) ? data.payments[0] : data.payments;
+    const wallet = Array.isArray(data.wallets) ? data.wallets[0] : data.wallets;
     return {
       username: data.username,
       first_name: data.first_name,
@@ -760,6 +771,11 @@ async function handle(method, url, body, params = {}) {
       exchange: pay?.exchange,
       email: data.email,
       referral_code: data.referral_code,
+      package_name: wallet?.packs?.name,
+      balance: wallet?.balance,
+      on_hold: wallet?.on_hold,
+      current_number_count: data.current_number_count,
+      total_number_can_play: data.total_number_can_play,
     };
   }
 
@@ -824,7 +840,62 @@ async function handle(method, url, body, params = {}) {
   if (m === "POST" && path === "/site_admin/users/update-balance") {
     const { error } = await supabase.from("wallets").update({ balance: payload.amount }).eq("user_id", payload.user_id);
     if (error) rpcError(error);
+    await supabase.rpc("sync_vip_from_balance", { p_user_id: payload.user_id });
     await logAdmin("Updated balance", payload.reason);
+    return { success: true };
+  }
+
+  if (m === "POST" && path === "/site_admin/users/create") {
+    await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_create_user", {
+      p_username: payload.username,
+      p_email: payload.email,
+      p_password: payload.password,
+      p_phone: payload.phone_number || payload.phone || null,
+      p_first_name: payload.first_name || null,
+      p_last_name: payload.last_name || null,
+      p_gender: payload.gender || null,
+    });
+    if (error) rpcError(error);
+    await logAdmin("Created user", payload.username);
+    return { success: true, data };
+  }
+
+  if (m === "POST" && path === "/site_admin/users/update-package") {
+    await requireAdmin();
+    if (!payload.user_id || !payload.package_id) fail("User and VIP pack are required");
+    const { data: pack, error: packErr } = await supabase.from("packs").select("id, daily_missions, name").eq("id", payload.package_id).single();
+    if (packErr) rpcError(packErr);
+    const { error } = await supabase.from("wallets").update({ package_id: pack.id }).eq("user_id", payload.user_id);
+    if (error) rpcError(error);
+    if (pack.daily_missions != null) {
+      await supabase.from("profiles").update({ total_number_can_play: pack.daily_missions }).eq("id", payload.user_id);
+    }
+    await logAdmin("Assigned VIP pack", pack.name);
+    return { success: true };
+  }
+
+  if (m === "POST" && path === "/site_admin/users/update-missions") {
+    await requireAdmin();
+    const patch = {};
+    if (payload.total_number_can_play != null && payload.total_number_can_play !== "") {
+      patch.total_number_can_play = Number(payload.total_number_can_play);
+    }
+    if (payload.current_number_count != null && payload.current_number_count !== "") {
+      patch.current_number_count = Number(payload.current_number_count);
+    }
+    if (!Object.keys(patch).length) fail("Enter remaining or completed missions");
+    const { error } = await supabase.from("profiles").update(patch).eq("id", payload.user_id);
+    if (error) rpcError(error);
+    await logAdmin("Updated missions", payload.reason);
+    return { success: true };
+  }
+
+  if (m === "POST" && path === "/site_admin/users/update-on-hold") {
+    await requireAdmin();
+    const { error } = await supabase.from("wallets").update({ on_hold: payload.amount }).eq("user_id", payload.user_id);
+    if (error) rpcError(error);
+    await logAdmin("Updated on hold", payload.reason);
     return { success: true };
   }
 
@@ -888,6 +959,13 @@ async function handle(method, url, body, params = {}) {
       const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", dep.user_id).single();
       await supabase.from("wallets").update({ balance: Number(wallet?.balance || 0) + Number(dep.amount) }).eq("user_id", dep.user_id);
       await supabase.rpc("sync_vip_from_balance", { p_user_id: dep.user_id });
+      const amount = Number(dep.amount || 0).toFixed(2);
+      await supabase.from("notifications").insert({
+        user_id: dep.user_id,
+        title: "Deposit confirmed",
+        message: `Your deposit of $${amount} has been confirmed and credited to your wallet.`,
+        is_read: false,
+      });
     }
     await logAdmin(`Deposit ${payload.status}`, payload.admin_password ? "verified" : "");
     return { success: true };
@@ -914,9 +992,20 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (path === "/site_admin/onholds" && m === "GET") {
+    await requireAdmin();
     const { data, error } = await supabase.from("on_holds").select("*").order("minimum_amount");
     if (error) rpcError(error);
-    return { results: data || [] };
+    const holds = await supabase.rpc("admin_list_user_holds");
+    if (holds.error) rpcError(holds.error);
+    const users = Array.isArray(holds.data) ? holds.data : holds.data || [];
+    return { data: { results: data || [], users }, results: data || [], users };
+  }
+  if (path === "/site_admin/user-holds" && m === "GET") {
+    await requireAdmin();
+    const holds = await supabase.rpc("admin_list_user_holds");
+    if (holds.error) rpcError(holds.error);
+    const users = Array.isArray(holds.data) ? holds.data : holds.data || [];
+    return { data: users, results: users, users };
   }
   if (path === "/site_admin/onholds" && m === "POST") {
     const { error } = await supabase.from("on_holds").insert({
@@ -1043,37 +1132,94 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (path === "/site_admin/negative-users" && m === "GET") {
-    const { data, error } = await supabase.from("negative_users").select("*, profiles(username)").order("rank");
+    await requireAdmin();
+    const { data, error } = await supabase
+      .from("negative_users")
+      .select("*, profiles(username, today_profit, current_number_count, total_number_can_play, last_connection)")
+      .order("id", { ascending: false });
     if (error) rpcError(error);
+    const ids = (data || []).map((r) => r.user_id).filter(Boolean);
+    let wallets = [];
+    if (ids.length) {
+      const wres = await supabase.from("wallets").select("user_id, balance, on_hold, salary").in("user_id", ids);
+      wallets = wres.data || [];
+    }
+    const walletByUser = Object.fromEntries(wallets.map((w) => [w.user_id, w]));
+    const holds = await supabase.rpc("admin_list_user_holds");
+    const holdRows = Array.isArray(holds.data) ? holds.data : [];
+    holdRows.forEach((h) => {
+      walletByUser[h.user_id] = { ...(walletByUser[h.user_id] || {}), ...h };
+    });
     return {
-      results: (data || []).map((r) => ({
-        ...r,
-        username: r.profiles?.username,
-        user: { username: r.profiles?.username },
-        count: r.number_of_negative_products,
-        rank_of_appearance: r.rank,
-      })),
+      results: (data || []).map((r) => {
+        const profile = r.profiles || {};
+        const wallet = walletByUser[r.user_id] || {};
+        return {
+          ...r,
+          username: profile.username,
+          user: { username: profile.username, id: r.user_id },
+          count: r.number_of_negative_products,
+          rank_of_appearance: r.rank,
+          today_profit: profile.today_profit,
+          current_number_count: profile.current_number_count,
+          total_number_can_play: profile.total_number_can_play,
+          last_connection: profile.last_connection,
+          balance: wallet.balance,
+          on_hold: wallet.on_hold,
+          on_hold_balance: wallet.on_hold,
+          salary: wallet.salary,
+          is_negative: r.is_active !== false,
+        };
+      }),
     };
   }
   if (path === "/site_admin/negative-users" && m === "POST") {
-    const { error } = await supabase.from("negative_users").insert({
-      user_id: payload.user_id,
-      number_of_negative_products: payload.number_of_negative_products,
-      rank: payload.rank,
+    await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_upsert_negative_user", {
+      p_user_id: payload.user_id,
+      p_range_min: Number(payload.range_min),
+      p_range_max: Number(payload.range_max),
+      p_negative_products: Number(payload.number_of_negative_products || payload.count),
+      p_rank: Number(payload.rank || payload.rank_of_appearance),
     });
     if (error) rpcError(error);
-    return { success: true };
+    await supabase.rpc("admin_clear_pending_game", { p_user_id: payload.user_id });
+    await logAdmin("Added negative user");
+    return { success: true, data };
+  }
+  const negToggle = path.match(/^\/site_admin\/negative-users\/([^/]+)\/toggle$/);
+  if (negToggle && m === "POST") {
+    await requireAdmin();
+    const active = payload.is_active === true || payload.is_active === "true";
+    const { data, error } = await supabase.rpc("admin_toggle_negative_user", {
+      p_id: negToggle[1],
+      p_active: active,
+    });
+    if (error) rpcError(error);
+    if (data?.user_id) await supabase.rpc("admin_clear_pending_game", { p_user_id: data.user_id });
+    await logAdmin(active ? "Enabled negative user" : "Disabled negative user");
+    return { success: true, data };
   }
   const negMatch = path.match(/^\/site_admin\/negative-users\/([^/]+)$/);
   if (negMatch && m === "PATCH") {
-    const { error } = await supabase
-      .from("negative_users")
-      .update({
-        number_of_negative_products: payload.number_of_negative_products || payload.count,
-        rank: payload.rank || payload.rank_of_appearance,
-      })
-      .eq("id", negMatch[1]);
+    await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_upsert_negative_user", {
+      p_user_id: payload.user_id,
+      p_range_min: Number(payload.range_min),
+      p_range_max: Number(payload.range_max),
+      p_negative_products: Number(payload.number_of_negative_products || payload.count),
+      p_rank: Number(payload.rank || payload.rank_of_appearance),
+    });
     if (error) rpcError(error);
+    await supabase.rpc("admin_clear_pending_game", { p_user_id: payload.user_id });
+    await logAdmin("Updated negative user");
+    return { success: true, data };
+  }
+  if (negMatch && m === "DELETE") {
+    await requireAdmin();
+    const { error } = await supabase.rpc("admin_delete_negative_user", { p_id: negMatch[1] });
+    if (error) rpcError(error);
+    await logAdmin("Deleted negative user");
     return { success: true };
   }
 

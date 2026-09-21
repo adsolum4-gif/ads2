@@ -1,6 +1,6 @@
 import { createSlice } from "@reduxjs/toolkit";
 import { api, authApi } from "../../api/client";
-import { fetchProfileSuccess, fetchProfileStart } from "./profileSlice";
+import { fetchProfileSuccess } from "./profileSlice";
 
 const productsSlice = createSlice({
   name: "products",
@@ -76,7 +76,6 @@ export const playGame = (ratingScore, comment) => async (dispatch) => {
     if (profile.success) {
       dispatch(fetchProfileSuccess(profile.data));
     }
-    dispatch(fetchProfileStart());
     dispatch(setCurrentGame(data.data || data || null));
     dispatch(setLoading(false));
     return { success: true, data: data.data || null };
