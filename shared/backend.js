@@ -296,6 +296,9 @@ async function handle(method, url, body, params = {}) {
       const { error: inErr } = await supabase.auth.signInWithPassword({ email: payload.email, password: payload.password });
       if (inErr) rpcError(inErr);
     }
+    if (!payload.referral_token && String(payload.invitation_code || "").trim() === "0000") {
+      fail("Invalid invitation code");
+    }
     const { data, error } = await supabase.rpc("complete_signup", {
       p_username: payload.username,
       p_phone: payload.phone_number,
@@ -675,8 +678,12 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "GET" && path === "/site_admin/users") {
+    await requireAdmin();
     let q = supabase.from("profiles").select("*, wallets(*, packs(*))", { count: "exact" });
-    if (params.search) q = q.or(`username.ilike.%${params.search}%,email.ilike.%${params.search}%`);
+    const term = String(params.search || "").trim().replace(/[%(),]/g, "");
+    if (term) {
+      q = q.or(`username.ilike.%${term}%,email.ilike.%${term}%,phone_number.ilike.%${term}%,referral_code.ilike.%${term}%`);
+    }
     const page = Number(params.page || 1);
     const pageSize = Number(params.page_size || 10);
     q = q.range((page - 1) * pageSize, page * pageSize - 1);
@@ -690,6 +697,7 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "POST" && path === "/auth/invitation-codes/generate-code") {
+    await requireAdmin();
     const session = await requireSession();
     let code = "";
     for (let i = 0; i < 20; i += 1) {

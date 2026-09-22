@@ -23,7 +23,7 @@ const empty = {
   last_name: "",
   gender: "",
   transactional_password: "",
-  invitation_code: "0000",
+  invitation_code: "",
   termsAccepted: false,
 };
 
@@ -35,7 +35,7 @@ export default function SignupOtp() {
   const [step, setStep] = useState(1);
   const [form, setForm] = useState({
     ...empty,
-    invitation_code: params.get("invite") || params.get("code") || "0000",
+    invitation_code: params.get("invite") || params.get("code") || "",
   });
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -110,6 +110,8 @@ export default function SignupOtp() {
     if (form.password !== form.confirmPassword) return toast.error("Passwords do not match");
     if (form.transactional_password.length !== 4) return toast.error("Transaction password must be exactly 4 digits");
     if (!referralOpen && !form.invitation_code.trim()) return toast.error("Please enter an invitation code.");
+    if (!referralOpen && form.invitation_code.trim().length !== 4) return toast.error("Invitation code must be 4 digits.");
+    if (!referralOpen && form.invitation_code.trim() === "0000") return toast.error("Invalid invitation code.");
     if (!form.termsAccepted) return toast.error("Please accept the terms and conditions to continue");
     setLoading(true);
     const result = await authApi.signupWithOtp({
@@ -122,7 +124,7 @@ export default function SignupOtp() {
       last_name: form.last_name,
       gender: form.gender,
       transactional_password: form.transactional_password,
-      invitation_code: referralOpen ? "0000" : form.invitation_code,
+      invitation_code: referralOpen ? "" : form.invitation_code.trim(),
       referral_token: referralOpen ? refToken : null,
     });
     setLoading(false);
@@ -255,8 +257,24 @@ export default function SignupOtp() {
                   </p>
                 ) : (
                   <>
-                    <input name="invitation_code" value={form.invitation_code} onChange={update} placeholder="0000" className={inputCls} required />
-                    <p className="text-gray-500 text-xs mt-1">Default code is 0000, or use a code from your referrer</p>
+                    <input
+                      name="invitation_code"
+                      value={form.invitation_code}
+                      onChange={(e) =>
+                        update({
+                          target: {
+                            name: "invitation_code",
+                            value: e.target.value.replace(/\D/g, "").slice(0, 4),
+                          },
+                        })
+                      }
+                      placeholder="4-digit code"
+                      inputMode="numeric"
+                      maxLength={4}
+                      className={inputCls}
+                      required
+                    />
+                    <p className="text-gray-500 text-xs mt-1">Enter a one-time invitation code from an admin or referrer</p>
                   </>
                 )}
               </Field>

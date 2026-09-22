@@ -85,7 +85,7 @@ export default function Refer() {
       const code = payload?.code || "";
       setLatestCode(code);
       if (code) copyText(code, "Invitation code");
-      toast.success("4-digit invitation code generated.");
+      toast.success("4-digit invitation code generated. It can only be used once.");
       await load();
     } catch (e) {
       showError(e);
@@ -165,7 +165,7 @@ export default function Refer() {
           <div>
             <h2 className="text-lg font-semibold text-gray-800">Generate invitation code</h2>
             <p className="text-sm text-gray-600 mt-1">
-              Creates a 4-digit invitation code. Share this code with users who are not using the special first-user link. The registration form defaults to <strong>0000</strong>.
+              Creates a 4-digit invitation code that can be used once. Share it with users who need to register.
             </p>
           </div>
         </div>

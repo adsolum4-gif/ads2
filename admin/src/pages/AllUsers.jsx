@@ -26,7 +26,7 @@ import {
 } from "@mui/material";
 import { format } from "date-fns";
 import { toast } from "sonner";
-import { MdContentCopy } from "react-icons/md";
+import { MdContentCopy, MdAccountCircle } from "react-icons/md";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
@@ -38,7 +38,8 @@ export default function AllUsers() {
   const [users, setUsers] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(0);
-  const [rows, setRows] = useState(10);
+  const [rows, setRows] = useState(5);
+  const [preview, setPreview] = useState(null);
   const [search, setSearch] = useState("");
   const [order, setOrder] = useState("No filter");
   const [expanded, setExpanded] = useState({});
@@ -73,8 +74,11 @@ export default function AllUsers() {
   };
 
   useEffect(() => {
-    load();
-  }, [page, rows, order]);
+    const timer = setTimeout(() => {
+      load();
+    }, search ? 350 : 0);
+    return () => clearTimeout(timer);
+  }, [page, rows, order, search]);
   useEffect(() => {
     api.get(endpoints.PACKS).then((res) => {
       const payload = unwrap(res);
@@ -87,32 +91,51 @@ export default function AllUsers() {
   const cols = useMemo(
     () => [
       { Header: "#", accessorKey: "id" },
-      { Header: "Profile", accessorKey: "profile_picture" },
       { Header: "Username", accessorKey: "username" },
-      { Header: "Email", accessorKey: "email" },
       { Header: "Phone No", accessorKey: "phone_number" },
       { Header: "Gender", accessorKey: "gender" },
       { Header: "Balance", accessorKey: "balance" },
-      { Header: "On hold", accessorKey: "onHold" },
-      { Header: "Actions", accessorKey: "actions" },
+      { Header: "Referral Code", accessorKey: "referral_code" },
+      { Header: "Image", accessorKey: "profile_picture" },
+      { Header: "Today's submission total", accessorKey: "todaySubmission" },
+      { Header: "Today's profit", accessorKey: "todayProfit" },
+      { Header: "Total Submission Set", accessorKey: "submissionSet" },
     ],
     []
   );
 
-  const rowsView = users.map((u) => ({
-    ...u,
-    balance: u.wallet?.balance,
-    onHold: u.wallet?.on_hold,
-    gender: u.gender === "M" ? "Male" : u.gender === "F" ? "Female" : u.gender,
-  }));
+  const rowsView = users.map((u) => {
+    const pack = u.wallet?.package || u.wallet?.packs || {};
+    const done = Number(u.current_number_count ?? 0);
+    const total = Number(u.total_number_can_play ?? 0);
+    const setTotal = Number(pack.number_of_set ?? 0);
+    const setDone = Number(u.current_set ?? u.total_sets_completed ?? 0);
+    return {
+      ...u,
+      balance: Number(u.wallet?.balance ?? u.balance ?? 0).toFixed(2),
+      onHold: u.wallet?.on_hold,
+      gender: u.gender === "M" ? "Male" : u.gender === "F" ? "Female" : u.gender || "",
+      referral_code: u.referral_code || "",
+      todaySubmission: `${done}/${total}`,
+      todayProfit: Number(u.today_profit ?? 0).toFixed(2),
+      submissionSet: `${setDone}/${setTotal}`,
+    };
+  });
 
   const generateCode = async () => {
     setInviting(true);
     try {
       const res = await api.post(endpoints.GENERATE_CODE);
       const payload = unwrap(res);
-      setInvite(payload?.code || payload?.invitation_code || payload);
-      toast.success("Copied");
+      const code = String(payload?.code || payload?.invitation_code || "").trim();
+      if (!code) throw new Error("No invitation code was returned.");
+      setInvite(code);
+      try {
+        await navigator.clipboard.writeText(code);
+        toast.success(`Invitation code ${code} generated. It can only be used once.`);
+      } catch {
+        toast.success(`Invitation code ${code} generated. It can only be used once. Copy it now.`);
+      }
     } catch (e) {
       showError(e);
     } finally {
@@ -188,67 +211,99 @@ export default function AllUsers() {
             </MenuItem>
           ))}
         </Menu>
-        <div className="relative">
-          <TextField size="small" InputProps={{ readOnly: true }} value={invite} />
-          {invite && (
-            <Button color="primary" onClick={() => { navigator.clipboard.writeText(invite); toast.success("Copied"); }} style={{ textTransform: "none" }}>
-              <MdContentCopy className="size-6" />
-            </Button>
-          )}
-        </div>
+        <TextField
+          variant="outlined"
+          placeholder="Search username, phone, email..."
+          size="small"
+          style={{ marginLeft: "auto", minWidth: 220 }}
+          value={search}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setPage(0);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") {
+              e.preventDefault();
+              load();
+            }
+          }}
+        />
         <Button onClick={generateCode} color="success" variant="contained" disabled={inviting} style={{ textTransform: "none" }}>
-          {inviting && <CircularProgress size={16} />} Generate an invitation code
+          {inviting && <CircularProgress size={16} className="mr-2" />} Generate an invitation code
         </Button>
-        <TextField variant="outlined" placeholder="Search" size="small" style={{ marginLeft: "auto" }} value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === "Enter" && load()} />
+        {invite && (
+          <Button
+            color="primary"
+            variant="outlined"
+            onClick={() => {
+              navigator.clipboard.writeText(invite);
+              toast.success("Copied");
+            }}
+            style={{ textTransform: "none" }}
+            startIcon={<MdContentCopy />}
+          >
+            {invite}
+          </Button>
+        )}
       </div>
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
             <TableRow>
               {cols.filter((c) => !hidden.includes(c.accessorKey)).map((c) => (
-                <TableCell key={c.accessorKey}>{c.Header}</TableCell>
+                <TableCell key={c.accessorKey} sx={{ fontWeight: 600, color: "text.secondary", whiteSpace: "nowrap" }}>
+                  {c.accessorKey === "id" ? (
+                    <TableSortLabel active direction="asc">{c.Header}</TableSortLabel>
+                  ) : (
+                    c.Header
+                  )}
+                </TableCell>
               ))}
             </TableRow>
           </TableHead>
           <TableBody>
             {rowsView.map((u, i) => (
               <Fragment key={u.id}>
-                <TableRow>
-                  <TableCell style={{ width: 50 }}>
-                    <div className="flex items-center justify-center">
-                      <Button size="small" onClick={() => setExpanded((e) => ({ ...e, [u.id]: !e[u.id] }))} style={{ minWidth: 25, padding: 0 }}>
-                        {expanded[u.id] ? "-" : "+"}
-                      </Button>
-                      <span className="ml-1">{page * rows + i + 1}</span>
-                    </div>
-                  </TableCell>
-                  {!hidden.includes("profile_picture") && (
-                    <TableCell>
-                      <img src={u.profile_picture || "/assets/profile-pic-Cd7mtiQf.jpg"} alt="" className="object-cover w-auto h-12 rounded-full cursor-pointer" />
+                <TableRow hover>
+                  {!hidden.includes("id") && (
+                    <TableCell style={{ width: 70 }}>
+                      <div className="flex items-center">
+                        <Button size="small" onClick={() => setExpanded((e) => ({ ...e, [u.id]: !e[u.id] }))} style={{ minWidth: 24, padding: 0, fontSize: 18, lineHeight: 1 }}>
+                          {expanded[u.id] ? "−" : "+"}
+                        </Button>
+                        <span className="ml-1">{page * rows + i + 1}</span>
+                      </div>
                     </TableCell>
                   )}
                   {!hidden.includes("username") && <TableCell>{u.username}</TableCell>}
-                  {!hidden.includes("email") && <TableCell>{u.email}</TableCell>}
-                  {!hidden.includes("phone_number") && <TableCell>{u.phone_number}</TableCell>}
-                  {!hidden.includes("gender") && <TableCell>{u.gender}</TableCell>}
+                  {!hidden.includes("phone_number") && <TableCell sx={{ whiteSpace: "nowrap" }}>{u.phone_number || "—"}</TableCell>}
+                  {!hidden.includes("gender") && <TableCell>{u.gender || "—"}</TableCell>}
                   {!hidden.includes("balance") && <TableCell>{u.balance}</TableCell>}
-                  {!hidden.includes("onHold") && (
-                    <TableCell sx={{ color: Number(u.onHold) < 0 ? "#d32f2f" : "inherit", fontWeight: Number(u.onHold) !== 0 ? 600 : 400 }}>
-                      ${Number(u.onHold || 0).toFixed(2)}
+                  {!hidden.includes("referral_code") && <TableCell>{u.referral_code || "—"}</TableCell>}
+                  {!hidden.includes("profile_picture") && (
+                    <TableCell>
+                      {u.profile_picture ? (
+                        <button type="button" onClick={() => setPreview({ src: u.profile_picture, name: u.username })} className="block">
+                          <img src={u.profile_picture} alt={u.username} className="object-cover w-10 h-10 rounded-md cursor-pointer hover:opacity-90" />
+                        </button>
+                      ) : (
+                        <MdAccountCircle className="text-4xl text-gray-400" />
+                      )}
                     </TableCell>
                   )}
-                  <TableCell>
-                    <Button size="small" variant="contained" color="secondary" onClick={(e) => openMenu(e, u)}>Unroll</Button>
-                  </TableCell>
+                  {!hidden.includes("todaySubmission") && <TableCell>{u.todaySubmission}</TableCell>}
+                  {!hidden.includes("todayProfit") && <TableCell>{u.todayProfit}</TableCell>}
+                  {!hidden.includes("submissionSet") && <TableCell>{u.submissionSet}</TableCell>}
                 </TableRow>
                 <TableRow>
-                  <TableCell colSpan={9} style={{ padding: 0 }}>
+                  <TableCell colSpan={10} style={{ padding: 0 }}>
                     <Collapse in={!!expanded[u.id]}>
-                      <div className="p-4">
+                      <div className="p-4 bg-gray-50">
+                        <p><strong>Email:</strong> {u.email || "—"}</p>
+                        <p><strong>On hold balance:</strong> {u.wallet?.on_hold}</p>
                         <p><strong>Total products submitted:</strong> {u.total_product_submitted ?? u.total_games_played}</p>
                         <p><strong>Total negative products submitted:</strong> {u.total_negative_product_submitted}</p>
                         <p><strong>Total wallet commission:</strong> {u.wallet?.commission}</p>
-                        <p><strong>On hold:</strong> {u.wallet?.on_hold}</p>
                         <p><strong>Salary:</strong> {u.wallet?.salary}</p>
                         <p><strong>Level:</strong> {u.wallet?.package?.name}</p>
                         <p><strong>Missions:</strong> {u.current_number_count ?? 0} / {u.total_number_can_play ?? 0}</p>
@@ -257,6 +312,7 @@ export default function AllUsers() {
                           <strong>Active:</strong>
                           <input type="checkbox" checked={!!u.active || !!u.is_active} onChange={() => toggleActive(u.id)} />
                         </p>
+                        <Button size="small" variant="contained" color="secondary" className="mt-2" onClick={(e) => openMenu(e, u)}>Unroll</Button>
                       </div>
                     </Collapse>
                   </TableCell>
@@ -265,7 +321,7 @@ export default function AllUsers() {
             ))}
           </TableBody>
         </Table>
-        <TablePagination component="div" count={count} page={page} rowsPerPage={rows} onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => { setRows(+e.target.value); setPage(0); }} rowsPerPageOptions={[5, 10, 25]} />
+        <TablePagination component="div" count={count} page={page} rowsPerPage={rows} onPageChange={(_, p) => setPage(p)} onRowsPerPageChange={(e) => { setRows(+e.target.value); setPage(0); }} rowsPerPageOptions={[5, 10, 25]} labelRowsPerPage="Rows per page:" />
       </TableContainer>
 
       <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
@@ -396,6 +452,18 @@ export default function AllUsers() {
         <TextField label="Admin Password" type="password" fullWidth value={form.admin_password || ""} onChange={(e) => setForm({ ...form, admin_password: e.target.value })} />
         <TextField label="Reason for deletion (optional)" fullWidth multiline value={form.reason || ""} onChange={(e) => setForm({ ...form, reason: e.target.value })} placeholder="Enter reason for deleting this user..." />
       </ActionDialog>
+
+      <Dialog open={!!preview} onClose={() => setPreview(null)} maxWidth="md">
+        <DialogTitle>{preview?.name || "Profile image"}</DialogTitle>
+        <DialogContent className="flex justify-center bg-black/90 p-2">
+          {preview?.src && (
+            <img src={preview.src} alt={preview.name || "Profile"} className="max-h-[80vh] max-w-full object-contain" />
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setPreview(null)}>Close</Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog open={!!info} onClose={() => setInfo(null)} fullWidth maxWidth="sm">
         <DialogTitle>User Information</DialogTitle>
