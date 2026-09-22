@@ -57,6 +57,9 @@ export default function AppLayout() {
         if (row?.title === "Deposit confirmed") {
           toast.success(row.message || "Your deposit has been confirmed.");
         }
+        if (row?.title === "Special product") {
+          toast.info(row.message || "You received a special product. Please reach out to customer care for any clarification.");
+        }
       })
       .subscribe();
 
@@ -99,7 +102,7 @@ export default function AppLayout() {
                 </span>
               )}
             </button>
-            <button type="button" onClick={() => navigate("/home/settings")} className="flex items-center">
+            <button type="button" onClick={() => navigate("/home/profile")} className="flex items-center">
               <span className="text-lg font-medium">{user?.first_name || ""}</span>
               {user?.profile_picture ? (
                 <img src={user.profile_picture} alt="Profile" className="w-6 h-6 ml-2 rounded-full object-cover" />

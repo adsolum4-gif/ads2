@@ -60,13 +60,15 @@ export function AdminLiveProvider({ children }) {
         })
         .on("postgres_changes", { event: "*", schema: "public", table: "deposits" }, (payload) => {
           emit("deposit", payload.new || payload.old, payload.eventType);
-          if (payload.eventType === "INSERT") {
-            const amount = payload.new?.amount ?? "0";
-            toast.info(`New deposit of $${amount}`);
-          }
+        })
+        .on("postgres_changes", { event: "*", schema: "public", table: "withdrawals" }, (payload) => {
+          emit("withdrawal", payload.new || payload.old, payload.eventType);
         })
         .on("postgres_changes", { event: "INSERT", schema: "public", table: "admin_notifications" }, (payload) => {
           emit("notification", payload.new, "INSERT");
+          const title = payload.new?.title || "Notification";
+          const message = payload.new?.message || "";
+          toast.info(message ? `${title}: ${message}` : title);
         })
         .subscribe((status) => {
           if (cancelled) return;

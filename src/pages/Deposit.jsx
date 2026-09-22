@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useSearchParams } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { FaCopy } from "react-icons/fa";
@@ -12,14 +13,24 @@ import { compressImage, formatFileSize } from "@shared/compressImage";
 
 export default function Deposit() {
   const dispatch = useDispatch();
+  const [searchParams] = useSearchParams();
   const deposits = useSelector((s) => s.deposits.deposits) || [];
   const user = useSelector((s) => s.profile.user);
   const submitting = useSelector((s) => s.deposits.isSubmitting);
+  const preset = searchParams.get("amount");
   const [tab, setTab] = useState("deposit");
-  const [amount, setAmount] = useState("");
+  const [amount, setAmount] = useState(() => {
+    const n = Number(preset);
+    return Number.isFinite(n) && n > 0 ? String(n) : "";
+  });
   const [confirm, setConfirm] = useState(false);
   const [receipt, setReceipt] = useState(null);
   const [receiptPreview, setReceiptPreview] = useState(null);
+
+  useEffect(() => {
+    const n = Number(searchParams.get("amount"));
+    if (Number.isFinite(n) && n > 0) setAmount(String(n));
+  }, [searchParams]);
 
   useEffect(() => {
     if (!deposits.length) dispatch(fetchDeposits());

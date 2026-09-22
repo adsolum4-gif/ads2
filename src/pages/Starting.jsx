@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
+import { useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import Swal from "sweetalert2";
 import { FaUserCircle, FaStar, FaTimes } from "react-icons/fa";
 import BottomNav from "../components/BottomNav";
 import ProductImage from "../components/ProductImage";
@@ -11,6 +13,7 @@ import { OvalLoader, Spinner } from "../components/Loader";
 import { authApi, showApiError } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure } from "../store/slices/profileSlice";
 import { fetchProducts, fetchCurrentGame, playGame } from "../store/slices/productsSlice";
+import { fetchNotifications } from "../store/slices/notificationsSlice";
 
 function chunk(arr, size) {
   const out = [];
@@ -27,6 +30,7 @@ const RATING_LABELS = ["Tap a star to rate", "Poor", "Fair", "Good", "Great", "E
 
 export default function Starting() {
   const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [page, setPage] = useState(0);
   const [open, setOpen] = useState(false);
   const [rating, setRating] = useState(0);
@@ -70,9 +74,17 @@ export default function Starting() {
 
   const reviewProducts = useMemo(() => {
     const assigned = (currentGame?.products || []).filter((p) => p && (p.name || p.image));
-    if (assigned.length) return assigned.slice(0, 3);
-    return [...(products || [])].sort(() => Math.random() - 0.5).slice(0, 3);
+    if (assigned.length) return assigned;
+    const pool = [...(products || [])].sort(() => Math.random() - 0.5);
+    return pool.slice(0, 1);
   }, [currentGame, products]);
+
+  const pictureGridClass =
+    reviewProducts.length <= 1
+      ? "grid grid-cols-1 max-w-[220px] mx-auto gap-2.5"
+      : reviewProducts.length === 2
+        ? "grid grid-cols-2 gap-2.5"
+        : "grid grid-cols-2 sm:grid-cols-3 gap-2.5";
 
   const startTask = async () => {
     const result = await dispatch(fetchCurrentGame());
@@ -85,6 +97,20 @@ export default function Starting() {
       toast.error("No task is available right now.");
       return;
     }
+    if (game.special_product || Number(game.penalty_hold) > 0) {
+      await refreshProfile();
+      dispatch(fetchNotifications(true));
+      Swal.fire({
+        title: "Congratulations!",
+        text: "You got a special product.",
+        icon: "success",
+        confirmButtonText: "Continue",
+        confirmButtonColor: "#dc2626",
+        width: 320,
+        padding: "1.75em 1.1em 1.25em",
+        customClass: { popup: "special-product-swal" },
+      });
+    }
     setRating(0);
     setComment("");
     setOpen(true);
@@ -93,6 +119,30 @@ export default function Starting() {
   const submitReview = async () => {
     if (!rating || rating < 1 || rating > 5) {
       toast.error("Please select a rating between 1 and 5.");
+      return;
+    }
+    const remainingHold = Number.isFinite(Number(user?.wallet?.on_hold))
+      ? Math.abs(Math.min(Number(user.wallet.on_hold), 0))
+      : 0;
+    const topUp = Number(currentGame?.top_up_amount);
+    const stillOwed =
+      remainingHold >= 0.01
+        ? remainingHold
+        : Number.isFinite(topUp) && topUp >= 0.01
+          ? topUp
+          : 0;
+    if ((currentGame?.special_product || Number(currentGame?.penalty_hold) > 0) && stillOwed >= 0.01) {
+      const topUpLabel = `$${stillOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+      Swal.fire({
+        title: "Sorry",
+        html: `<p style="line-height:1.5">Your current balance is not sufficient to clear this product. Please top up with <strong>${topUpLabel}</strong> before you can clear this product. Contact customer care for any issues.</p>`,
+        icon: "warning",
+        confirmButtonText: "OK",
+        confirmButtonColor: "#dc2626",
+        width: 320,
+        padding: "1.75em 1.1em 1.25em",
+        customClass: { popup: "special-product-swal" },
+      });
       return;
     }
     setSubmitting(true);
@@ -113,10 +163,19 @@ export default function Starting() {
     }
   };
 
+  const holdAmount = Number(user?.wallet?.on_hold);
+  const clearHoldAmount =
+    Number.isFinite(holdAmount) && holdAmount <= -0.01 ? Math.abs(holdAmount) : 0;
+
   const stats = [
     { label: "Wallet Balance", amount: `$${money(user?.wallet?.balance)}`, description: "Does not reset after 24 hours" },
     { label: "Today's Profit", amount: `$${money(user?.today_profit)}`, description: "Resets after 24 hours" },
-    { label: "On Hold", amount: `$${money(user?.wallet?.on_hold)}`, description: Number(user?.wallet?.on_hold) < 0 ? "Negative amount held on this account" : "Will be added to your balance" },
+    {
+      label: "On Hold",
+      amount: `$${money(user?.wallet?.on_hold)}`,
+      description: clearHoldAmount > 0 ? "Negative amount held on this account" : "Will be added to your balance",
+      clearNow: clearHoldAmount > 0,
+    },
     { label: "Salary", amount: `$${money(user?.wallet?.salary)}`, description: "Accumulated from completed tasks" },
   ];
 
@@ -145,9 +204,18 @@ export default function Starting() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: i * 0.1 }}
-              className="p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border border-red-200"
+              className="relative p-4 bg-gradient-to-br from-red-50 to-red-100 rounded-xl shadow-md hover:shadow-lg transition-all duration-200 border border-red-200"
             >
-              <p className="font-bold text-sm text-gray-800 mb-1">{item.label}</p>
+              {item.clearNow && (
+                <button
+                  type="button"
+                  onClick={() => navigate(`/home/deposit?amount=${clearHoldAmount.toFixed(2)}`)}
+                  className="absolute top-3 right-3 text-[11px] font-semibold text-red-600 hover:text-red-700 underline underline-offset-2"
+                >
+                  Clear now
+                </button>
+              )}
+              <p className="font-bold text-sm text-gray-800 mb-1 pr-16">{item.label}</p>
               <p className="text-xs text-gray-600 mb-2">{item.description}</p>
               <p className="text-red-600 font-bold text-xl">
                 {item.amount} <span className="text-sm text-gray-600">USD</span>
@@ -268,16 +336,25 @@ export default function Starting() {
                 </button>
                 <p className="text-[11px] tracking-[0.22em] uppercase text-white/65 font-medium">Product review</p>
                 <h2 className="text-2xl font-semibold mt-1 tracking-tight">Submit your review</h2>
-                <p className="text-sm text-white/75 mt-1.5 pr-8">Rate the products randomly assigned to this task.</p>
+                <p className="text-sm text-white/75 mt-1.5 pr-8">
+                  {currentGame.special_product || Number(currentGame.penalty_hold) > 0
+                    ? "Special product review"
+                    : "Rate the product assigned to this task."}
+                </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="text-[11px] font-semibold uppercase tracking-wider bg-white/12 border border-white/15 rounded-full px-3 py-1">
                     Randomized set
                   </span>
+                  {(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
+                    <span className="text-[11px] font-semibold uppercase tracking-wider bg-amber-300/20 border border-amber-200/40 text-amber-100 rounded-full px-3 py-1">
+                      Special product
+                    </span>
+                  )}
                 </div>
               </div>
 
               <div className="px-5 py-5 overflow-y-auto space-y-5">
-                <div className="grid grid-cols-3 gap-2.5">
+                <div className={pictureGridClass}>
                   {reviewProducts.map((p) => (
                     <div key={p.id || p.name} className="rounded-2xl border border-gray-100 bg-gray-50/80 overflow-hidden shadow-sm">
                       <div className="aspect-square bg-white">
@@ -285,7 +362,7 @@ export default function Starting() {
                       </div>
                       <div className="px-2 py-2 text-center">
                         <p className="text-[11px] sm:text-xs font-semibold text-gray-800 leading-tight line-clamp-2 min-h-[2rem]">{p.name}</p>
-                        {p.price != null && (
+                        {p.price != null && !(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
                           <p className="text-[11px] font-bold text-red-600 mt-1">${money(p.price)}</p>
                         )}
                       </div>

@@ -32,7 +32,7 @@ export default function Withdrawals() {
     finally { setLoading(false); }
   };
   useEffect(() => { load(); }, []);
-  useAdminLiveRefresh(["user"], () => load());
+  useAdminLiveRefresh(["user", "withdrawal", "notification"], () => load());
 
   const save = async () => {
     setSaving(true);

@@ -10,7 +10,9 @@ import SignupOtp from "./pages/SignupOtp";
 import Terms from "./pages/Terms";
 import Home from "./pages/Home";
 import Starting from "./pages/Starting";
+import Profile from "./pages/Profile";
 import Settings from "./pages/Settings";
+import Personal from "./pages/Personal";
 import Payment from "./pages/Payment";
 import Notifications from "./pages/Notifications";
 import Records from "./pages/Records";
@@ -41,9 +43,9 @@ export default function App() {
           <Route path="/home" element={<AppLayout />}>
             <Route index element={<Home />} />
             <Route path="starting" element={<Starting />} />
+            <Route path="profile" element={<Profile />} />
             <Route path="settings" element={<Settings />} />
-            <Route path="profile" element={<Navigate to="/home/settings" replace />} />
-            <Route path="personal" element={<Navigate to="/home/settings" replace />} />
+            <Route path="personal" element={<Personal />} />
             <Route path="payment" element={<Payment />} />
             <Route path="contact" element={<Contact />} />
             <Route path="notifications" element={<Notifications />} />

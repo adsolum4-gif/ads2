@@ -37,6 +37,23 @@ const BY_NAME = {
   "USB Cable": "/assets/products/cable.jpg",
   "Bathroom Scale": "/assets/products/scale.jpg",
   "Tea Kettle": "/assets/products/kettle.jpg",
+  "Air Fryer": "/assets/products/airfryer.jpg",
+  "Coffee Maker": "/assets/products/coffeemaker.jpg",
+  "Beard Trimmer": "/assets/products/shaver.jpg",
+  "Kitchen Blender": "/assets/products/blender.jpg",
+  "Portable SSD": "/assets/products/ssd.jpg",
+  "USB Webcam": "/assets/products/webcam.jpg",
+  "Toaster": "/assets/products/toaster.jpg",
+  "Ethernet Cable": "/assets/products/hdmi.jpg",
+  "Travel Umbrella": "/assets/products/umbrella.jpg",
+  "Vacuum Cleaner": "/assets/products/vacuum.jpg",
+  "Laptop Charger": "/assets/products/charger.jpg",
+  "Fitness Band": "/assets/products/band.jpg",
+  "Yoga Mat": "/assets/products/yogamat.jpg",
+  "Gaming Laptop": "/assets/products/gaminglaptop.jpg",
+  "DSLR Camera": "/assets/products/dslr.jpg",
+  "Flagship Phone": "/assets/products/flagship.jpg",
+  "Camera Drone": "/assets/products/prodrone.jpg",
 };
 
 export default function ProductImage({ src, name, alt, className = "" }) {

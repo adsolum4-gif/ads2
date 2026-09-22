@@ -4,10 +4,10 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { FaUserCircle, FaCopy } from "react-icons/fa";
-import VipBadge from "../components/VipBadge";
 import { MdChevronRight, MdLogout } from "react-icons/md";
 import { HiOutlineCreditCard } from "react-icons/hi";
 import { IoPersonOutline } from "react-icons/io5";
+import VipBadge, { vipLevel, vipMeta } from "../components/VipBadge";
 import BottomNav from "../components/BottomNav";
 import Loader from "../components/Loader";
 import { authApi } from "../api/client";
@@ -15,22 +15,25 @@ import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure } from "../
 import { logout } from "../store/slices/authSlice";
 import { fadeIn } from "../utils/motion";
 
+function money(value) {
+  const n = Number(value);
+  return `$${Number.isFinite(n) ? n.toFixed(2) : "0.00"}`;
+}
+
 const MenuRow = ({ icon: Icon, label, onClick, last }) => (
-  <motion.div
-    initial={fadeIn("right").initial}
-    whileInView={fadeIn("right", 2).animate}
-    whileHover={{ x: 5 }}
+  <button
+    type="button"
     onClick={onClick}
-    className={`flex items-center cursor-pointer justify-between p-5 ${last ? "" : "border-b"} hover:bg-red-50 transition-all duration-200`}
+    className={`flex w-full items-center cursor-pointer justify-between px-5 py-4 text-left ${last ? "" : "border-b border-gray-100"} hover:bg-gray-50 transition-colors`}
   >
     <div className="flex items-center space-x-4">
-      <div className="bg-red-100 rounded-lg p-2.5">
-        <Icon className="text-red-600 text-xl" />
+      <div className="bg-red-50 rounded-lg p-2">
+        <Icon className="text-red-500 text-lg" />
       </div>
-      <p className="text-gray-700 font-bold">{label}</p>
+      <p className="text-gray-800 font-medium">{label}</p>
     </div>
-    <MdChevronRight className="text-gray-400 text-xl" />
-  </motion.div>
+    <MdChevronRight className="text-gray-300 text-xl" />
+  </button>
 );
 
 export default function Profile() {
@@ -41,23 +44,20 @@ export default function Profile() {
 
   useEffect(() => {
     (async () => {
-      if (!user) {
-        dispatch(fetchProfileStart());
-        const result = await authApi.fetchProfile();
-        if (result.success) dispatch(fetchProfileSuccess(result.data));
-        else {
-          dispatch(fetchProfileFailure(result.message));
-          toast.error(result.message || "Failed to load profile.");
-        }
+      dispatch(fetchProfileStart());
+      const result = await authApi.fetchProfile();
+      if (result.success) dispatch(fetchProfileSuccess(result.data));
+      else {
+        dispatch(fetchProfileFailure(result.message));
+        if (!user) toast.error(result.message || "Failed to load profile.");
       }
     })();
-  }, [dispatch, user]);
+  }, [dispatch]);
 
   const copy = () => {
-    if (user?.referral_code) {
-      navigator.clipboard.writeText(user.referral_code);
-      toast.success("Referral code copied!");
-    }
+    if (!user?.referral_code) return;
+    navigator.clipboard.writeText(user.referral_code);
+    toast.success("Referral code copied!");
   };
 
   const handleLogout = () => {
@@ -65,78 +65,73 @@ export default function Profile() {
     navigate("/login");
   };
 
-  if (loading || !user) return <Loader />;
+  if ((loading && !user) || !user) return <Loader />;
+
+  const pack = user.wallet?.package || user.wallet?.packs;
+  const meta = vipMeta(pack);
+  const level = vipLevel(pack);
+  const wallet = user.wallet || {};
 
   return (
-    <div className="bg-white md:overflow-hidden">
+    <div className="bg-[#f4f4f4] min-h-full">
       <motion.div
         initial={fadeIn("down").initial}
-        whileInView={fadeIn("down", 2).animate}
-        className="bg-red-600 rounded-2xl md:mx-4 md:my-6 mx-2 md:p-8 p-2 mt-2 text-white"
+        animate={fadeIn("down", 2).animate}
+        className="bg-red-600 rounded-2xl mx-3 md:mx-4 mt-3 md:mt-2 p-5 md:p-6 text-white"
       >
         <div className="flex justify-between items-center">
-          <div className="flex items-center">
+          <div className="flex items-center min-w-0">
             {user.profile_picture ? (
-              <img src={user.profile_picture} alt="Profile" className="md:w-24 md:h-24 w-16 h-16 md:mr-6 mr-2 rounded-full object-cover" />
+              <img src={user.profile_picture} alt="Profile" className="w-14 h-14 md:w-16 md:h-16 mr-3 rounded-full object-cover border-2 border-white/30" />
             ) : (
-              <FaUserCircle className="md:text-6xl text-4xl md:mr-6 mr-2" />
+              <FaUserCircle className="text-5xl mr-3 shrink-0" />
             )}
-            <div>
-              <p className="text-xl font-bold">{user.username || "N/A"}</p>
-              <div className="text-md">
-                Referral code:
-                <div className="flex flex-wrap items-center mt-1">
-                  <span className="font-bold">{user.referral_code || "N/A"}</span>
-                  <FaCopy onClick={copy} className="ml-2 cursor-pointer" />
-                </div>
-              </div>
+            <div className="min-w-0">
+              <p className="text-lg md:text-xl font-bold truncate">{user.username || "N/A"}</p>
+              <p className="text-sm text-white/90 mt-0.5">Referral code:</p>
+              <button type="button" onClick={copy} className="flex items-center font-bold tracking-wide">
+                <span>{user.referral_code || "N/A"}</span>
+                <FaCopy className="ml-2 text-sm opacity-90" />
+              </button>
             </div>
           </div>
-          <div className="text-center">
-            <div className="flex justify-center ml-4">
-              <VipBadge pack={user.wallet?.package} size={56} />
+          <div className="text-center shrink-0 ml-3">
+            <div className="flex justify-center">
+              <VipBadge pack={pack} size={52} />
             </div>
-            <p className="font-bold text-sm mt-2">{user.wallet?.package?.name || "N/A"}</p>
+            <p className="font-semibold text-xs mt-1.5 whitespace-nowrap">
+              {meta.metal} (VIP{level})
+            </p>
           </div>
         </div>
-        <div className="border-t border-yellow-400 mt-2 md:mt-6 gap-2 md:gap-6 sm:flex sm:justify-between text-md hidden md:flex">
-          <Stat label="Wallet Balance:" value={`$${user.wallet?.balance || "0.00"}`} />
-          <Stat label="On Hold Amount:" value={`$${user.wallet?.on_hold || "0.00"}`} yellow />
-          <Stat label="Commission:" value={`$${user.today_profit || "0.00"}`} />
-          <Stat label="Credit Score:" value={`${user.wallet?.credit_score || "N/A"}%`} />
-          <Stat label="Salary:" value={`$${user.wallet?.salary || "N/A"}`} />
-        </div>
-        <div className="border-t md:hidden border-yellow-400 mt-2 pt-4 grid gap-2 text-md">
-          <div className="grid grid-cols-2 gap-2">
-            <Stat label="Wallet Balance:" value={`$${user.wallet?.balance || "0.00"}`} />
-            <Stat label="On Hold Amount:" value={`$${user.wallet?.on_hold || "0.00"}`} yellow />
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Stat label="Commission:" value={`$${user.today_profit || "0.00"}`} />
-            <Stat label="Credit Score:" value={`${user.wallet?.credit_score || "N/A"} %`} />
-            <Stat label="Salary:" value={`$${user.wallet?.salary || "N/A"}`} />
-          </div>
+
+        <div className="border-t border-yellow-400/80 mt-4 pt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+          <Stat label="Wallet Balance:" value={money(wallet.balance)} />
+          <Stat label="On Hold Amount:" value={money(wallet.on_hold)} yellow />
+          <Stat label="Commission:" value={money(wallet.commission ?? user.today_profit)} />
+          <Stat label="Credit Score:" value={`${Number(wallet.credit_score ?? 0).toFixed(2)}%`} />
+          <Stat label="Salary:" value={money(wallet.salary)} />
         </div>
       </motion.div>
 
-      <div className="space-y-4 md:mx-6 mx-2 md:mb-4 mb-52">
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+      <div className="space-y-3 mx-3 md:mx-4 mt-4 mb-28 md:mb-6">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <MenuRow icon={HiOutlineCreditCard} label="Deposit" onClick={() => navigate("/home/deposit")} />
           <MenuRow icon={HiOutlineCreditCard} label="Withdraw" onClick={() => navigate("/home/withdraw")} last />
         </div>
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <MenuRow icon={IoPersonOutline} label="Personal Information" onClick={() => navigate("/home/personal")} />
           <MenuRow icon={HiOutlineCreditCard} label="Payment Methods" onClick={() => navigate("/home/payment")} last />
         </div>
-        <div className="bg-white rounded-xl shadow-lg border border-gray-100">
+        <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <MenuRow icon={IoPersonOutline} label="Contact Us" onClick={() => navigate("/home/contact")} />
           <MenuRow icon={IoPersonOutline} label="Notifications" onClick={() => navigate("/home/notifications")} last />
         </div>
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          whileHover={{ scale: 1.01 }}
+          whileTap={{ scale: 0.99 }}
           onClick={handleLogout}
-          className="w-full bg-red-600 hover:bg-red-700 text-white md:mb-2 mb-52 shadow-lg font-bold py-3.5 rounded-xl flex items-center justify-center"
+          className="w-full bg-red-600 hover:bg-red-700 text-white shadow-sm font-semibold py-3.5 rounded-xl flex items-center justify-center"
         >
           <MdLogout className="mr-2 text-xl" /> Logout
         </motion.button>
@@ -148,9 +143,9 @@ export default function Profile() {
 
 function Stat({ label, value, yellow }) {
   return (
-    <div className="text-center">
-      <p>{label}</p>
-      <p className={`${yellow ? "text-yellow-400" : ""} font-bold text-lg`}>{value}</p>
+    <div>
+      <p className="text-white/90">{label}</p>
+      <p className={`${yellow ? "text-yellow-300" : ""} font-bold text-base md:text-lg mt-0.5`}>{value}</p>
     </div>
   );
 }

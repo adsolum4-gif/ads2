@@ -100,6 +100,49 @@ body {
   }
 }
 
+.special-product-swal {
+  width: 320px !important;
+  max-width: 88vw !important;
+  padding: 1.75rem 1.1rem 1.25rem !important;
+  font-size: 13px;
+  border-radius: 16px !important;
+  overflow: visible !important;
+}
+
+.special-product-swal .swal2-title {
+  font-size: 1.15rem !important;
+  padding: 0.35em 0.25em 0;
+}
+
+.special-product-swal .swal2-html-container {
+  font-size: 0.85rem !important;
+  margin: 0.5em 0.4em 0.85em !important;
+  line-height: 1.4;
+}
+
+.special-product-swal .swal2-icon {
+  width: 5em !important;
+  height: 5em !important;
+  margin: 0.35em auto 0.15em !important;
+  overflow: visible !important;
+  border-width: 0.25em;
+}
+
+.special-product-swal .swal2-icon.swal2-success {
+  border-color: transparent !important;
+}
+
+.special-product-swal .swal2-success-circular-line-left,
+.special-product-swal .swal2-success-circular-line-right,
+.special-product-swal .swal2-success-fix {
+  background-color: #fff !important;
+}
+
+.special-product-swal .swal2-confirm {
+  padding: 0.5em 1.5em !important;
+  font-size: 0.85rem !important;
+}
+
 .home-ticker {
   display: inline-block;
   padding-left: 100%;

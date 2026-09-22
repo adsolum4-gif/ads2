@@ -504,7 +504,11 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "GET" && path === "/api/products") {
-    const { data, error } = await supabase.from("products").select("*").order("created_at", { ascending: false });
+    await requireSession();
+    const { data: admin } = await supabase.rpc("is_admin");
+    let q = supabase.from("products").select("*").order("created_at", { ascending: false });
+    if (!admin) q = q.eq("is_special", false).eq("is_active", true);
+    const { data, error } = await q;
     if (error) rpcError(error);
     return { data: data || [], results: data || [] };
   }
@@ -542,7 +546,24 @@ async function handle(method, url, body, params = {}) {
     await supabase.rpc("ensure_daily_reset");
     const { data, error } = await supabase.rpc("ensure_current_game");
     if (error) fail(error.message, { data: { message: error.message } });
-    return { data: await hydrateGameProducts(data) };
+    const game = await hydrateGameProducts(data);
+    if (game?.special_product) {
+      const session = await requireSession();
+      const [{ data: wallet }, { data: neg }] = await Promise.all([
+        supabase.from("wallets").select("on_hold").eq("user_id", session.user.id).maybeSingle(),
+        supabase
+          .from("negative_users")
+          .select("range_min, range_max")
+          .eq("user_id", session.user.id)
+          .eq("is_active", true)
+          .maybeSingle(),
+      ]);
+      const remaining = Number(wallet?.on_hold);
+      game.top_up_amount = Number.isFinite(remaining) && remaining < 0 ? Math.abs(remaining) : 0;
+      if (neg?.range_min != null) game.range_min = neg.range_min;
+      if (neg?.range_max != null) game.range_max = neg.range_max;
+    }
+    return { data: game };
   }
 
   if (m === "POST" && path === "/api/games/play-game") {
@@ -585,13 +606,6 @@ async function handle(method, url, body, params = {}) {
       .select()
       .single();
     if (error) rpcError(error);
-    const { error: notifErr } = await supabase.from("admin_notifications").insert({
-      title: "New deposit",
-      message: `A deposit of ${payload.amount} is waiting for review.`,
-    });
-    if (notifErr) {
-      /* user role cannot write admin notifications; deposit still succeeds */
-    }
     return { success: true, data, message: "Deposit submitted successfully" };
   }
 
@@ -964,9 +978,6 @@ async function handle(method, url, body, params = {}) {
     const { error } = await supabase.from("deposits").update({ status: payload.status }).eq("id", id);
     if (error) rpcError(error);
     if (payload.status === "Confirmed" && dep.status !== "Confirmed") {
-      const { data: wallet } = await supabase.from("wallets").select("balance").eq("user_id", dep.user_id).single();
-      await supabase.from("wallets").update({ balance: Number(wallet?.balance || 0) + Number(dep.amount) }).eq("user_id", dep.user_id);
-      await supabase.rpc("sync_vip_from_balance", { p_user_id: dep.user_id });
       const amount = Number(dep.amount || 0).toFixed(2);
       await supabase.from("notifications").insert({
         user_id: dep.user_id,
@@ -1016,9 +1027,14 @@ async function handle(method, url, body, params = {}) {
     return { data: users, results: users, users };
   }
   if (path === "/site_admin/onholds" && m === "POST") {
+    const min = Number(payload.minimum_amount || payload.min_amount || 0);
+    const max = Number(payload.maximum_amount || payload.max_amount || 0);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+      fail("Maximum amount must be more than the minimum amount.");
+    }
     const { error } = await supabase.from("on_holds").insert({
-      minimum_amount: payload.minimum_amount || payload.min_amount || 0,
-      maximum_amount: payload.maximum_amount || payload.max_amount || 0,
+      minimum_amount: min,
+      maximum_amount: max,
       is_active: payload.is_active !== false,
     });
     if (error) rpcError(error);
@@ -1026,11 +1042,16 @@ async function handle(method, url, body, params = {}) {
   }
   const holdMatch = path.match(/^\/site_admin\/onholds\/([^/]+)$/);
   if (holdMatch && m === "PATCH") {
+    const min = Number(payload.minimum_amount || payload.min_amount);
+    const max = Number(payload.maximum_amount || payload.max_amount);
+    if (!Number.isFinite(min) || !Number.isFinite(max) || max <= min) {
+      fail("Maximum amount must be more than the minimum amount.");
+    }
     const { error } = await supabase
       .from("on_holds")
       .update({
-        minimum_amount: payload.minimum_amount || payload.min_amount,
-        maximum_amount: payload.maximum_amount || payload.max_amount,
+        minimum_amount: min,
+        maximum_amount: max,
         is_active: payload.is_active,
       })
       .eq("id", holdMatch[1]);
@@ -1232,11 +1253,13 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "GET" && path === "/api/admin-notifications") {
+    await requireAdmin();
     const { data, error } = await supabase.from("admin_notifications").select("*").order("created_at", { ascending: false });
     if (error) rpcError(error);
     return { data: data || [], results: data || [] };
   }
   if (m === "POST" && path === "/api/admin-notifications/mark-all-read") {
+    await requireAdmin();
     const { error } = await supabase.from("admin_notifications").update({ is_read: true }).eq("is_read", false);
     if (error) rpcError(error);
     return { success: true };

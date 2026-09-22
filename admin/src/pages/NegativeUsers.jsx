@@ -115,17 +115,14 @@ export default function NegativeUsers() {
     if (!Number.isInteger(rank) || rank < 1) {
       return toast.error("Rank of appearance must be a whole number of at least 1.");
     }
-    if (rank < products) {
-      return toast.error("Rank of appearance must be equal to or more than the number of negative products.");
-    }
     if (rank > vipRankCap) {
       return toast.error(`Rank of appearance cannot exceed ${vipRankCap} for VIP ${selectedLevel}.`);
     }
     if (leftToday != null && leftToday < 1) {
       return toast.error("This user has no product appearances left today.");
     }
-    if (leftToday != null && (rank > leftToday || products > leftToday)) {
-      return toast.error(`This user has ${leftToday} appearances left today. Rank and negative products cannot be higher than that.`);
+    if (leftToday != null && rank > leftToday) {
+      return toast.error(`This user has ${leftToday} appearances left today. Rank cannot be higher than that.`);
     }
     setSaving(true);
     try {
@@ -138,7 +135,7 @@ export default function NegativeUsers() {
       };
       if (current) await api.patch(endpoints.NEGATIVE_USER(current.id), body);
       else await api.post(endpoints.NEGATIVE_USERS, body);
-      toast.success(current ? "Negative user updated." : "Negative user added. On hold will increase by one share after each ranked appearance.");
+      toast.success(current ? "Negative user updated." : "Negative user added. The special product will appear once in the rank window.");
       setOpen(false);
       setCurrent(null);
       load();
@@ -293,7 +290,7 @@ export default function NegativeUsers() {
                           body:
                             r.is_negative !== false
                               ? `This will clear ${r.username}'s on-hold penalty. Their actual wallet balance will stay the same.`
-                              : `This will turn the penalty back on. On hold will increase by one share after each ranked appearance. Their actual wallet balance will stay the same.`,
+                              : `This will turn the penalty back on. The special product will appear once in the rank window. Their actual wallet balance will stay the same.`,
                         })
                       }
                     />
@@ -370,7 +367,7 @@ export default function NegativeUsers() {
                         body:
                           r.is_negative !== false
                           ? `This will clear ${r.username}'s on-hold penalty. Their actual wallet balance will stay the same.`
-                          : `This will turn the penalty back on. On hold will increase by one share after each ranked appearance. Their actual wallet balance will stay the same.`,
+                          : `This will turn the penalty back on. The special product will appear once in the rank window. Their actual wallet balance will stay the same.`,
                       })
                     }
                   />
@@ -448,7 +445,7 @@ export default function NegativeUsers() {
             inputMode="numeric"
             value={form.number_of_negative_products}
             onChange={(e) => setForm({ ...form, number_of_negative_products: digitsOnly(e.target.value) })}
-            helperText="Whole number only. Rank of appearance must be equal to or more than this. Range amount is split across these products."
+            helperText="How many pictures show on that one special review. Regular products always show one picture."
           />
           <TextField
             label="Rank of appearance"
@@ -458,8 +455,8 @@ export default function NegativeUsers() {
             onChange={(e) => setForm({ ...form, rank: digitsOnly(e.target.value) })}
             helperText={
               selectedUser
-                ? `Must be equal to or more than negative products. VIP ${selectedLevel} max is ${vipRankCap}. Window starts after ${doneToday}/${totalToday || "\u2014"}.`
-                : "Must be equal to or more than the number of negative products. Max grows by 10 each VIP level (VIP 3 = 50)."
+                ? `VIP ${selectedLevel} max is ${vipRankCap}. Window starts after ${doneToday}/${totalToday || "\u2014"} and the special product appears once in that window.`
+                : "The special product appears once inside this window. Max grows by 10 each VIP level (VIP 3 = 50)."
             }
           />
           {selectedUser && (
@@ -472,7 +469,7 @@ export default function NegativeUsers() {
               </p>
               <p className="mt-1 text-amber-900">
                 From {doneToday}/{totalToday || 0}, rank {form.rank || "\u2014"} sets the window starting at task {doneToday + 1}
-                {form.rank ? ` through ${doneToday + Number(form.rank)}` : ""}. Each of the {form.number_of_negative_products || "N"} appearances adds one share of the range to on hold. The full range amount only shows after the last appearance.
+                {form.rank ? ` through ${doneToday + Number(form.rank)}` : ""}. The special product appears once in that window, with {form.number_of_negative_products || "N"} picture{Number(form.number_of_negative_products) === 1 ? "" : "s"}. Special amount is their current balance plus a value in the selected range.
               </p>
             </div>
           )}
