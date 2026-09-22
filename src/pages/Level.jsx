@@ -42,9 +42,17 @@ export default function Level() {
                 <h3 className="text-lg font-semibold text-gray-800">{meta.metal} (VIP{meta.level})</h3>
                 <p className={`text-xs font-semibold uppercase tracking-wide mt-0.5 mb-3 ${meta.text}`}>{meta.title}</p>
                 <div className="space-y-1">
-                  {(pack.description || "").split(/\r\n/).map((line, idx) => (
-                    <p key={idx} className="text-gray-600 text-sm">{line.trim()}</p>
-                  ))}
+                  {(pack.description || "")
+                    .split(/\r?\n/)
+                    .map((line) => line.trim())
+                    .filter((line) => {
+                      const name = line.replace(/\.$/, "").toLowerCase();
+                      const metal = meta.metal.toLowerCase();
+                      return name && name !== meta.title.toLowerCase() && name !== `${metal} member` && name !== `${metal} rank` && name !== metal;
+                    })
+                    .map((line, idx) => (
+                      <p key={idx} className="text-gray-600 text-sm">{line}</p>
+                    ))}
                 </div>
               </motion.div>
             );

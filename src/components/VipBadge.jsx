@@ -13,11 +13,11 @@ export const VIP_TIERS = [
   { level: 10, title: "Celestial Crown", metal: "Celestial", wrap: "bg-[#111827]", ring: "ring-[#F59E0B]/50", border: "border-amber-400", text: "text-amber-300" },
 ];
 
-const VALUES = [0, 100, 500, 13500, 15500, 35500, 65500, 155550, 50000, 100000];
-const MISSIONS = [40, 50, 60, 60, 65, 70, 75, 80, 180, 200];
-const PROFITS = ["0.50", "0.80", "1.00", "2.50", "3.90", "5.10", "5.50", "6.10", "3.50", "4.00"];
+const VALUES = [0, 100, 500, 13500, 15500, 35500, 65500, 155550, 255550, 455550];
+const MISSIONS = [40, 50, 60, 60, 65, 70, 75, 80, 85, 95];
+const PROFITS = ["0.50", "0.80", "1.00", "2.50", "3.90", "5.10", "5.50", "6.10", "6.80", "7.50"];
 const MAX_WITHDRAW = [5000, 10000, 20000, 40000, 80000, 150000, 300000, 500000, 750000, 1000000];
-const WITHDRAWALS = [1, 1, 2, 6, 7, 7, 8, 10, 10, 15];
+const WITHDRAWALS = [1, 1, 2, 6, 7, 7, 8, 10, 12, 15];
 
 export const DEFAULT_VIP_PACKS = VIP_TIERS.map((tier, i) => ({
   id: `vip-fallback-${tier.level}`,
