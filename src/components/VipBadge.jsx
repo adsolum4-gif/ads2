@@ -4,20 +4,20 @@ export const VIP_TIERS = [
   { level: 1, title: "Bronze Circlet", metal: "Bronze", wrap: "bg-[#F4E6D4]", ring: "ring-[#C08A4A]/40", border: "border-[#C08A4A]/30", text: "text-amber-800" },
   { level: 2, title: "Copper Crown", metal: "Copper", wrap: "bg-[#FBE6D8]", ring: "ring-[#E08A54]/40", border: "border-[#E08A54]/30", text: "text-orange-800" },
   { level: 3, title: "Silver Coronet", metal: "Silver", wrap: "bg-[#EEF2F6]", ring: "ring-[#8A93A3]/40", border: "border-slate-300", text: "text-slate-600" },
-  { level: 4, title: "Gold Crown", metal: "Gold", wrap: "bg-[#FFF4D6]", ring: "ring-[#E8B923]/50", border: "border-amber-300", text: "text-amber-700" },
-  { level: 5, title: "Rose Tiara", metal: "Rose gold", wrap: "bg-[#FDE8EA]", ring: "ring-[#C45C6A]/40", border: "border-rose-300", text: "text-rose-700" },
-  { level: 6, title: "Platinum Imperial", metal: "Platinum", wrap: "bg-[#E9EEF6]", ring: "ring-[#7F8DA6]/40", border: "border-indigo-200", text: "text-indigo-700" },
-  { level: 7, title: "Emerald Royal", metal: "Emerald", wrap: "bg-[#E7F6EC]", ring: "ring-[#1F7A4D]/40", border: "border-emerald-300", text: "text-emerald-800" },
-  { level: 8, title: "Diamond Legend", metal: "Diamond", wrap: "bg-[#F3E8FF]", ring: "ring-[#7C3AED]/40", border: "border-violet-300", text: "text-violet-800" },
+  { level: 4, title: "Emerald Member", metal: "Emerald", wrap: "bg-[#E7F6EC]", ring: "ring-[#1F7A4D]/40", border: "border-emerald-300", text: "text-emerald-800" },
+  { level: 5, title: "Diamond Member", metal: "Diamond", wrap: "bg-[#F4F7FB]", ring: "ring-[#7C8BA1]/40", border: "border-slate-300", text: "text-slate-700" },
+  { level: 6, title: "Masters Rank", metal: "Masters", wrap: "bg-[#E9EEF6]", ring: "ring-[#7F8DA6]/40", border: "border-indigo-200", text: "text-indigo-700" },
+  { level: 7, title: "GrandMasters Rank", metal: "GrandMasters", wrap: "bg-[#F3E8FF]", ring: "ring-[#7C3AED]/40", border: "border-violet-300", text: "text-violet-800" },
+  { level: 8, title: "Crown Member", metal: "Crown", wrap: "bg-[#FFF4D6]", ring: "ring-[#E8B923]/50", border: "border-amber-300", text: "text-amber-700" },
   { level: 9, title: "Sapphire Sovereign", metal: "Sapphire", wrap: "bg-[#DBEAFE]", ring: "ring-[#2563EB]/40", border: "border-blue-300", text: "text-blue-800" },
   { level: 10, title: "Celestial Crown", metal: "Celestial", wrap: "bg-[#111827]", ring: "ring-[#F59E0B]/50", border: "border-amber-400", text: "text-amber-300" },
 ];
 
-const VALUES = [0, 100, 500, 1000, 2500, 5000, 10000, 25000, 50000, 100000];
-const MISSIONS = [40, 50, 60, 80, 90, 100, 120, 150, 180, 200];
-const PROFITS = ["0.50", "0.80", "1.00", "1.20", "1.50", "1.80", "2.20", "3.00", "3.50", "4.00"];
+const VALUES = [0, 100, 500, 13500, 15500, 35500, 65500, 155550, 50000, 100000];
+const MISSIONS = [40, 50, 60, 60, 65, 70, 75, 80, 180, 200];
+const PROFITS = ["0.50", "0.80", "1.00", "2.50", "3.90", "5.10", "5.50", "6.10", "3.50", "4.00"];
 const MAX_WITHDRAW = [5000, 10000, 20000, 40000, 80000, 150000, 300000, 500000, 750000, 1000000];
-const WITHDRAWALS = [1, 1, 2, 3, 3, 4, 5, 8, 10, 15];
+const WITHDRAWALS = [1, 1, 2, 6, 7, 7, 8, 10, 10, 15];
 
 export const DEFAULT_VIP_PACKS = VIP_TIERS.map((tier, i) => ({
   id: `vip-fallback-${tier.level}`,
@@ -58,12 +58,17 @@ export function vipIconSrc(pack) {
 }
 
 export function vipFromBalance(packs, balance) {
-  const list = withVipLevels(packs);
+  const list = [...withVipLevels(packs)].sort((a, b) => vipLevel(a) - vipLevel(b));
   const bal = Number(balance || 0);
   let current = list[0] || DEFAULT_VIP_PACKS[0];
-  list.forEach((pack) => {
-    if (bal >= Number(pack.usd_value || 0)) current = pack;
-  });
+  for (const pack of list) {
+    const need = Number(pack.usd_value || 0);
+    const level = vipLevel(pack);
+    const lowerMet = list
+      .filter((other) => vipLevel(other) < level)
+      .every((other) => bal >= Number(other.usd_value || 0));
+    if (bal >= need && lowerMet) current = pack;
+  }
   return current;
 }
 

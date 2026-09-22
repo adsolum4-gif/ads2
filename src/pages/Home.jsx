@@ -174,7 +174,7 @@ export default function Home() {
             <MdChevronRight className="text-2xl ml-1" />
           </motion.button>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-5">
           {isLoading ? (
             <p className="col-span-full text-center text-gray-500 py-8">Loading packs...</p>
           ) : error ? (
