@@ -654,7 +654,13 @@ async function handle(method, url, body, params = {}) {
 
   if (m === "GET" && path === "/api/notifications") {
     const session = await requireSession();
-    const { data, error } = await supabase.from("notifications").select("*").eq("user_id", session.user.id).order("created_at", { ascending: false });
+    const cutoff = new Date(Date.now() - 10 * 24 * 60 * 60 * 1000).toISOString();
+    const { data, error } = await supabase
+      .from("notifications")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .gte("created_at", cutoff)
+      .order("created_at", { ascending: false });
     if (error) rpcError(error);
     return { data: data || [] };
   }

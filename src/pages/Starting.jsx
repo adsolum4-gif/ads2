@@ -61,6 +61,7 @@ export default function Starting() {
   const refreshProfile = useCallback(async () => {
     const result = await authApi.fetchProfile();
     if (result.success) dispatch(fetchProfileSuccess(result.data));
+    return result;
   }, [dispatch]);
 
   const slides = products?.length ? chunk(products, 7) : [[]];
@@ -100,16 +101,19 @@ export default function Starting() {
     if (game.special_product || Number(game.penalty_hold) > 0) {
       await refreshProfile();
       dispatch(fetchNotifications(true));
-      Swal.fire({
-        title: "Congratulations!",
-        text: "You got a special product.",
-        icon: "success",
-        confirmButtonText: "Continue",
-        confirmButtonColor: "#dc2626",
-        width: 320,
-        padding: "1.75em 1.1em 1.25em",
-        customClass: { popup: "special-product-swal" },
-      });
+      const remaining = Number(game.top_up_amount);
+      if (Number.isFinite(remaining) && remaining >= 0.01) {
+        Swal.fire({
+          title: "Congratulations!",
+          text: "You got a special product.",
+          icon: "success",
+          confirmButtonText: "Continue",
+          confirmButtonColor: "#dc2626",
+          width: 320,
+          padding: "1.75em 1.1em 1.25em",
+          customClass: { popup: "special-product-swal" },
+        });
+      }
     }
     setRating(0);
     setComment("");
@@ -121,16 +125,10 @@ export default function Starting() {
       toast.error("Please select a rating between 1 and 5.");
       return;
     }
-    const remainingHold = Number.isFinite(Number(user?.wallet?.on_hold))
-      ? Math.abs(Math.min(Number(user.wallet.on_hold), 0))
-      : 0;
-    const topUp = Number(currentGame?.top_up_amount);
-    const stillOwed =
-      remainingHold >= 0.01
-        ? remainingHold
-        : Number.isFinite(topUp) && topUp >= 0.01
-          ? topUp
-          : 0;
+    const profile = await refreshProfile();
+    const holdValue = Number(profile?.success ? profile.data?.wallet?.on_hold : user?.wallet?.on_hold);
+    const remainingHold = Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
+    const stillOwed = remainingHold >= 0.01 ? remainingHold : 0;
     if ((currentGame?.special_product || Number(currentGame?.penalty_hold) > 0) && stillOwed >= 0.01) {
       const topUpLabel = `$${stillOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       Swal.fire({
