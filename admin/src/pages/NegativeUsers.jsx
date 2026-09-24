@@ -469,7 +469,7 @@ export default function NegativeUsers() {
               </p>
               <p className="mt-1 text-amber-900">
                 From {doneToday}/{totalToday || 0}, rank {form.rank || "\u2014"} sets the window starting at task {doneToday + 1}
-                {form.rank ? ` through ${doneToday + Number(form.rank)}` : ""}. The special product appears once in that window, with {form.number_of_negative_products || "N"} picture{Number(form.number_of_negative_products) === 1 ? "" : "s"}. Special amount is their current balance plus a value in the selected range.
+                {form.rank ? ` through ${doneToday + Number(form.rank)}` : ""}. The special product appears once in that window, with {form.number_of_negative_products || "N"} picture{Number(form.number_of_negative_products) === 1 ? "" : "s"}. Special amount is a value inside the selected range.
               </p>
             </div>
           )}
