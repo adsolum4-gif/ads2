@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Button, CircularProgress, TextField } from "@mui/material";
 import { toast } from "sonner";
-import { api, unwrap, showError } from "../api/client";
+import { api, ensureAdminSession, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
 
@@ -11,13 +11,8 @@ const FIELDS = [
   ["registration_bonus", "Bonus when registering in USD"],
   ["service_availability_start_time", "Service availability start time"],
   ["service_availability_end_time", "Service availability end time"],
-  ["whatsapp_contact", "WhatsApp Contact"],
-  ["telegram_contact", "Telegram Contact"],
-  ["telegram_username", "Telegram User Name"],
   ["timezone", "Time Zone"],
   ["minimum_balance_for_submissions", "Minimum balance for submissions"],
-  ["online_chat_url", "Online Chat Url"],
-  ["online_embed_url", "Online Embedded Chat URL"],
   ["erc_address", "ETH address"],
   ["trc_address", "TRC20 address"],
 ];
@@ -31,6 +26,7 @@ export default function Settings() {
   const load = async () => {
     setLoading(true);
     try {
+      await ensureAdminSession();
       const res = await api.get(endpoints.SETTINGS);
       setForm(unwrap(res) || {});
       setError(false);
@@ -42,6 +38,11 @@ export default function Settings() {
   const save = async () => {
     setSaving(true);
     try {
+      const session = await ensureAdminSession();
+      if (!session) {
+        toast.error("Session expired. Please log out and sign in again.");
+        return;
+      }
       await api.patch(endpoints.PATCH_SETTINGS, form);
       toast.success("Settings updated successfully");
     } catch (e) { showError(e); }

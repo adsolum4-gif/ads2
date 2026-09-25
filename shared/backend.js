@@ -1134,6 +1134,7 @@ async function handle(method, url, body, params = {}) {
   }
 
   if (m === "PATCH" && path === "/site_admin/settings/update-settings") {
+    await requireAdmin();
     const allowed = [
       "percentage_of_sponsors",
       "token_validity_period",
@@ -1154,16 +1155,20 @@ async function handle(method, url, body, params = {}) {
     allowed.forEach((k) => {
       if (payload[k] != null) patch[k] = payload[k];
     });
-    const { error } = await supabase.from("settings").update(patch).eq("id", 1);
+    if (!Object.keys(patch).length) fail("No settings to update.");
+    const { data, error } = await supabase.from("settings").update(patch).eq("id", 1).select().maybeSingle();
     if (error) rpcError(error);
-    return { success: true };
+    if (!data) fail("Settings were not saved. Please log out and sign in again as admin.");
+    return { data, success: true };
   }
 
   if (m === "POST" && path === "/site_admin/settings/update-video") {
+    await requireAdmin();
     const video = await uploadFile("videos", payload.video, "home/");
-    const { error } = await supabase.from("settings").update({ video }).eq("id", 1);
+    const { data, error } = await supabase.from("settings").update({ video }).eq("id", 1).select().maybeSingle();
     if (error) rpcError(error);
-    return { success: true };
+    if (!data) fail("Video setting was not saved. Please log out and sign in again as admin.");
+    return { data, success: true };
   }
 
   if (path === "/site_admin/negative-users" && m === "GET") {

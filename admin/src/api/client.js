@@ -19,19 +19,10 @@ export function showError(error, fallback = "An unknown server error occurred. P
   } else toast.error(fallback);
 }
 
-export async function restoreAdminSession() {
+export async function ensureAdminSession() {
   const { data } = await supabase.auth.getSession();
-  if (data.session) {
-    localStorage.setItem(
-      "adminUser",
-      JSON.stringify({
-        ...(JSON.parse(localStorage.getItem("adminUser") || "{}") || {}),
-        access_token: data.session.access_token,
-        refresh_token: data.session.refresh_token,
-      })
-    );
-    return data.session;
-  }
+  if (data.session) return data.session;
+
   try {
     const stored = JSON.parse(localStorage.getItem("adminUser") || "null");
     if (stored?.access_token && stored?.refresh_token) {
@@ -39,10 +30,25 @@ export async function restoreAdminSession() {
         access_token: stored.access_token,
         refresh_token: stored.refresh_token,
       });
+      if (restored.error) return null;
       return restored.data.session || null;
     }
   } catch {
     return null;
   }
   return null;
+}
+
+export async function restoreAdminSession() {
+  const session = await ensureAdminSession();
+  if (!session) return null;
+  localStorage.setItem(
+    "adminUser",
+    JSON.stringify({
+      ...(JSON.parse(localStorage.getItem("adminUser") || "{}") || {}),
+      access_token: session.access_token,
+      refresh_token: session.refresh_token,
+    })
+  );
+  return session;
 }

@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import { CircularProgress } from "@mui/material";
 import { FaCheckCircle } from "react-icons/fa";
 import PasswordInput from "../components/PasswordInput";
-import { api, unwrap, showError } from "../api/client";
+import { api, restoreAdminSession, unwrap, showError } from "../api/client";
+import { supabase } from "@shared/supabase";
 import { endpoints } from "../api/endpoints";
 import { setUser } from "../store";
 
@@ -29,13 +30,19 @@ export default function Login() {
         password,
       });
       const payload = unwrap({ data });
+      const access = payload.access || payload.access_token;
+      const refresh = payload.refresh || payload.refresh_token;
+      if (access && refresh) {
+        await supabase.auth.setSession({ access_token: access, refresh_token: refresh });
+      }
+      await restoreAdminSession();
       setSuccess(true);
       setTimeout(() => {
         setSuccess(false);
         dispatch(
           setUser({
-            access_token: payload.access || payload.access_token,
-            refresh_token: payload.refresh || payload.refresh_token,
+            access_token: access,
+            refresh_token: refresh,
             ...payload,
           })
         );

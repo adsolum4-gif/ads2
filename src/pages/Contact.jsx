@@ -7,6 +7,7 @@ import BackButton from "../components/BackButton";
 import Loader from "../components/Loader";
 import { authApi } from "../api/client";
 import { fetchSettingsStart, fetchSettingsSuccess, fetchSettingsFailure } from "../store/slices/authSlice";
+import { normalizeOnlineChatUrl, telegramChatUrl, whatsappChatUrl } from "@shared/contactLinks";
 
 export default function Contact() {
   const settings = useSelector((s) => s.auth.settings);
@@ -26,12 +27,16 @@ export default function Contact() {
     })();
   }, [dispatch, settings]);
 
-  const open = (url) => {
-    if (url) window.open(url, "_blank");
-    else toast.error("Unable to navigate. URL is invalid.");
+  const open = (url, missingMessage) => {
+    if (url) window.open(url, "_blank", "noopener,noreferrer");
+    else toast.error(missingMessage || "This contact option is not available yet.");
   };
 
   if (!settings) return <Loader />;
+
+  const onlineUrl = normalizeOnlineChatUrl(settings.online_chat_url);
+  const whatsappUrl = whatsappChatUrl(settings.whatsapp_contact);
+  const telegramUrl = telegramChatUrl(settings.telegram_username);
 
   return (
     <div className="flex flex-col items-center justify-center mt-10 md:mb-2 mb-52 text-gray-800">
@@ -50,26 +55,26 @@ export default function Contact() {
         <h2 className="text-xl font-semibold text-gray-800 mb-6">Choose a Support Option</h2>
         <div className="space-y-4">
           <button
-            onClick={() => settings.online_chat_url && open(settings.online_chat_url)}
-            className="w-full bg-red-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-red-600"
+            type="button"
+            onClick={() => open(onlineUrl, "Online chat link has not been set up yet.")}
+            className="w-full bg-red-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"
+            disabled={!onlineUrl}
           >
             <FaHeadset /> Online Chat
           </button>
           <button
-            onClick={() => {
-              const phone = settings.whatsapp_contact?.replace(/[^\d]/g, "");
-              if (phone) open(`https://wa.me/${phone}`);
-            }}
-            className="w-full bg-green-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-green-600"
+            type="button"
+            onClick={() => open(whatsappUrl, "WhatsApp number has not been set up yet.")}
+            className="w-full bg-green-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 disabled:opacity-50"
+            disabled={!whatsappUrl}
           >
             <FaWhatsapp /> WhatsApp Chat
           </button>
           <button
-            onClick={() => {
-              const user = settings.telegram_username?.replace("@", "");
-              if (user) open(`https://t.me/${user}`);
-            }}
-            className="w-full bg-blue-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-blue-600"
+            type="button"
+            onClick={() => open(telegramUrl, "Telegram handle has not been set up yet.")}
+            className="w-full bg-blue-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-blue-600 disabled:opacity-50"
+            disabled={!telegramUrl}
           >
             <FaTelegram /> Telegram Chat
           </button>

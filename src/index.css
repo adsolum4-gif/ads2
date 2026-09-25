@@ -65,6 +65,17 @@
   background-color: #fff;
 }
 
+/* Fixed mobile bottom nav: keep last actions scrollable and tappable */
+@media (max-width: 767px) {
+  .mobile-scroll-main {
+    scroll-padding-bottom: 16rem;
+  }
+
+  .mobile-bottom-nav-space {
+    padding-bottom: calc(16rem + env(safe-area-inset-bottom, 0px));
+  }
+}
+
 html,
 body {
   height: 100%;

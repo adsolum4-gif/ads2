@@ -112,7 +112,7 @@ export default function AppLayout() {
             </button>
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto md:p-4">
+        <div className="flex-1 overflow-y-auto md:p-4 mobile-scroll-main">
           <Outlet />
         </div>
       </div>

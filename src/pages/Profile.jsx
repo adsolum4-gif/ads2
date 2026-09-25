@@ -73,7 +73,7 @@ export default function Profile() {
   const wallet = user.wallet || {};
 
   return (
-    <div className="bg-[#f4f4f4] min-h-full">
+    <div className="bg-[#f4f4f4] min-h-full flow-root mobile-bottom-nav-space md:pb-0">
       <motion.div
         initial={fadeIn("down").initial}
         animate={fadeIn("down", 2).animate}
@@ -114,7 +114,7 @@ export default function Profile() {
         </div>
       </motion.div>
 
-      <div className="space-y-3 mx-3 md:mx-4 mt-4 mb-28 md:mb-6">
+      <div className="space-y-3 mx-3 md:mx-4 mt-4 mb-4 md:mb-6">
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
           <MenuRow icon={HiOutlineCreditCard} label="Deposit" onClick={() => navigate("/home/deposit")} />
           <MenuRow icon={HiOutlineCreditCard} label="Withdraw" onClick={() => navigate("/home/withdraw")} last />
@@ -128,13 +128,15 @@ export default function Profile() {
           <MenuRow icon={IoPersonOutline} label="Notifications" onClick={() => navigate("/home/notifications")} last />
         </div>
         <motion.button
+          type="button"
           whileHover={{ scale: 1.01 }}
           whileTap={{ scale: 0.99 }}
           onClick={handleLogout}
-          className="w-full bg-red-600 hover:bg-red-700 text-white shadow-sm font-semibold py-3.5 rounded-xl flex items-center justify-center"
+          className="relative z-20 w-full bg-red-600 hover:bg-red-700 text-white shadow-sm font-semibold py-3.5 rounded-xl flex items-center justify-center touch-manipulation"
         >
           <MdLogout className="mr-2 text-xl" /> Logout
         </motion.button>
+        <div className="md:hidden h-12 shrink-0" aria-hidden="true" />
       </div>
       <BottomNav />
     </div>

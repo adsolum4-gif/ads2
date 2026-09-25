@@ -12,6 +12,7 @@ import {
   MdCampaign,
   MdHistory,
   MdSettings,
+  MdSupportAgent,
   MdVideocam,
   MdLogout,
   MdExpandMore,
@@ -228,6 +229,10 @@ export default function Sidebar({ isCollapsed, closeSidebar }) {
         <NavLink to="/admin/home/video" className={navItem} onClick={closeSidebar} title="Home video">
           <MdVideocam className="text-[20px] shrink-0" />
           {!isCollapsed && <span>Home video</span>}
+        </NavLink>
+        <NavLink to="/admin/home/contact" className={navItem} onClick={closeSidebar} title="Contact support">
+          <MdSupportAgent className="text-[20px] shrink-0" />
+          {!isCollapsed && <span>Contact support</span>}
         </NavLink>
 
         <SectionLabel collapsed={isCollapsed}>System</SectionLabel>

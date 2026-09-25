@@ -16,6 +16,7 @@ import Events from "./pages/Events";
 import Announcements from "./pages/Announcements";
 import Logs from "./pages/Logs";
 import Settings from "./pages/Settings";
+import ContactSettings from "./pages/ContactSettings";
 import Video from "./pages/Video";
 import Profile from "./pages/Profile";
 import Refer from "./pages/Refer";
@@ -59,6 +60,7 @@ export default function App() {
           <Route path="announcements" element={<Announcements />} />
           <Route path="logs" element={<Logs />} />
           <Route path="settings" element={<Settings />} />
+          <Route path="contact" element={<ContactSettings />} />
           <Route path="video" element={<Video />} />
           <Route path="profile" element={<Profile />} />
           <Route path="refer" element={<Refer />} />
