@@ -1148,6 +1148,9 @@ async function handle(method, url, body, params = {}) {
       "minimum_balance_for_submissions",
       "online_chat_url",
       "online_embed_url",
+      "show_online_chat",
+      "show_whatsapp",
+      "show_telegram",
       "erc_address",
       "trc_address",
     ];

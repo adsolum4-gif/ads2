@@ -34,9 +34,40 @@ export default function Contact() {
 
   if (!settings) return <Loader />;
 
-  const onlineUrl = normalizeOnlineChatUrl(settings.online_chat_url);
-  const whatsappUrl = whatsappChatUrl(settings.whatsapp_contact);
-  const telegramUrl = telegramChatUrl(settings.telegram_username);
+  const showOnline = settings.show_online_chat !== false;
+  const showWhatsapp = settings.show_whatsapp !== false;
+  const showTelegram = settings.show_telegram !== false;
+
+  const onlineUrl = showOnline ? normalizeOnlineChatUrl(settings.online_chat_url) : null;
+  const whatsappUrl = showWhatsapp ? whatsappChatUrl(settings.whatsapp_contact) : null;
+  const telegramUrl = showTelegram ? telegramChatUrl(settings.telegram_username) : null;
+
+  const options = [
+    showOnline && {
+      key: "online",
+      label: "Online Chat",
+      icon: FaHeadset,
+      url: onlineUrl,
+      missing: "Online chat link has not been set up yet.",
+      className: "bg-red-500 hover:bg-red-600",
+    },
+    showWhatsapp && {
+      key: "whatsapp",
+      label: "WhatsApp Chat",
+      icon: FaWhatsapp,
+      url: whatsappUrl,
+      missing: "WhatsApp number has not been set up yet.",
+      className: "bg-green-500 hover:bg-green-600",
+    },
+    showTelegram && {
+      key: "telegram",
+      label: "Telegram Chat",
+      icon: FaTelegram,
+      url: telegramUrl,
+      missing: "Telegram handle has not been set up yet.",
+      className: "bg-blue-500 hover:bg-blue-600",
+    },
+  ].filter(Boolean);
 
   return (
     <div className="flex flex-col items-center justify-center mt-10 md:mb-2 mb-52 text-gray-800">
@@ -54,30 +85,21 @@ export default function Contact() {
       <div className="bg-white p-8 rounded-lg shadow-md w-80 text-center">
         <h2 className="text-xl font-semibold text-gray-800 mb-6">Choose a Support Option</h2>
         <div className="space-y-4">
-          <button
-            type="button"
-            onClick={() => open(onlineUrl, "Online chat link has not been set up yet.")}
-            className="w-full bg-red-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-red-600 disabled:opacity-50"
-            disabled={!onlineUrl}
-          >
-            <FaHeadset /> Online Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => open(whatsappUrl, "WhatsApp number has not been set up yet.")}
-            className="w-full bg-green-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-green-600 disabled:opacity-50"
-            disabled={!whatsappUrl}
-          >
-            <FaWhatsapp /> WhatsApp Chat
-          </button>
-          <button
-            type="button"
-            onClick={() => open(telegramUrl, "Telegram handle has not been set up yet.")}
-            className="w-full bg-blue-500 text-white py-2 rounded-full flex items-center justify-center gap-2 hover:bg-blue-600 disabled:opacity-50"
-            disabled={!telegramUrl}
-          >
-            <FaTelegram /> Telegram Chat
-          </button>
+          {options.length === 0 ? (
+            <p className="text-gray-500 text-sm py-2">No support options are available right now. Please check back later.</p>
+          ) : (
+            options.map(({ key, label, icon: Icon, url, missing, className }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => open(url, missing)}
+                className={`w-full text-white py-2 rounded-full flex items-center justify-center gap-2 disabled:opacity-50 ${className}`}
+                disabled={!url}
+              >
+                <Icon /> {label}
+              </button>
+            ))
+          )}
         </div>
       </div>
     </div>

@@ -17,7 +17,7 @@ export default function ChatWidget() {
   }, [dispatch, settings]);
 
   useEffect(() => {
-    if (!settings?.online_chat_url || !settings?.online_embed_url) return;
+    if (settings?.show_online_chat === false || !settings?.online_chat_url || !settings?.online_embed_url) return;
     const script = document.createElement("script");
     script.async = true;
     script.src = settings.online_embed_url;
