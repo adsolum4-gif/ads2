@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { NavLink, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { useDispatch, useSelector } from "react-redux";
@@ -12,9 +13,12 @@ import {
   MdAddCard,
   MdEvent,
   MdLogout,
+  MdSupportAgent,
 } from "react-icons/md";
 import { logout } from "../store/slices/authSlice";
 import { slideIn } from "../utils/motion";
+import { supabase } from "@shared/supabase";
+import { subscribeSupport } from "@shared/supportChat";
 
 const links = [
   { to: "/home", label: "Home", icon: MdHome, end: true },
@@ -23,6 +27,7 @@ const links = [
   { to: "/home/profile", label: "Profile", icon: MdPerson },
   { to: "/home/settings", label: "Settings", icon: MdSettings },
   { to: "/home/notifications", label: "Notifications", icon: MdNotifications, badge: true },
+  { to: "/home/support", label: "Support 24/7", icon: MdSupportAgent, support: true },
   { to: "/home/withdraw", label: "Withdraw", icon: MdAccountBalanceWallet },
   { to: "/home/deposit", label: "Deposit", icon: MdAddCard },
   { to: "/home/events", label: "Events", icon: MdEvent },
@@ -32,6 +37,21 @@ export default function Sidebar() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const unread = useSelector((s) => s.notifications.notifications.filter((n) => !n.is_read).length);
+  const [supportUnread, setSupportUnread] = useState(0);
+
+  useEffect(() => {
+    let live = true;
+    const load = async () => {
+      const { count } = await supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("user_unread", true);
+      if (live) setSupportUnread(count || 0);
+    };
+    load();
+    const stop = subscribeSupport(() => load());
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
 
   const handleLogout = () => {
     dispatch(logout());
@@ -60,6 +80,11 @@ export default function Sidebar() {
                 {link.badge && unread > 0 && (
                   <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-red-200">
                     {unread > 99 ? "99+" : unread}
+                  </span>
+                )}
+                {link.support && supportUnread > 0 && (
+                  <span className="absolute -top-1.5 -right-2 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center ring-2 ring-red-200">
+                    {supportUnread > 99 ? "99+" : supportUnread}
                   </span>
                 )}
               </span>

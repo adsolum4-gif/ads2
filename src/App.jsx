@@ -17,6 +17,7 @@ import Payment from "./pages/Payment";
 import Notifications from "./pages/Notifications";
 import Records from "./pages/Records";
 import Contact from "./pages/Contact";
+import Support from "./pages/Support";
 import ContractRules from "./pages/ContractRules";
 import About from "./pages/About";
 import Faq from "./pages/Faq";
@@ -48,6 +49,7 @@ export default function App() {
             <Route path="personal" element={<Personal />} />
             <Route path="payment" element={<Payment />} />
             <Route path="contact" element={<Contact />} />
+            <Route path="support" element={<Support />} />
             <Route path="notifications" element={<Notifications />} />
             <Route path="records" element={<Records />} />
             <Route path="rules" element={<ContractRules />} />

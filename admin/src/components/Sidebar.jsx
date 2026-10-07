@@ -13,6 +13,7 @@ import {
   MdHistory,
   MdSettings,
   MdSupportAgent,
+  MdChat,
   MdVideocam,
   MdLogout,
   MdExpandMore,
@@ -23,6 +24,7 @@ import {
   MdAccountBalanceWallet,
 } from "react-icons/md";
 import { supabase } from "@shared/supabase";
+import { subscribeSupport } from "@shared/supportChat";
 import { clearUser } from "../store";
 import { useAdminLive } from "../live";
 
@@ -68,11 +70,26 @@ export default function Sidebar({ isCollapsed, closeSidebar }) {
   const [usersOpen, setUsersOpen] = useState(pathname.includes("users") || pathname.includes("negusers"));
   const [finOpen, setFinOpen] = useState(pathname.includes("deposit") || pathname.includes("withdrawal"));
   const [pulse, setPulse] = useState({ user: false, deposit: false });
+  const [chatUnread, setChatUnread] = useState(0);
 
   useEffect(() => {
     if (pathname.includes("allusers") || pathname.includes("negusers")) setUsersOpen(true);
     if (pathname.includes("deposit") || pathname.includes("withdrawal")) setFinOpen(true);
   }, [pathname]);
+
+  useEffect(() => {
+    let live = true;
+    const loadChats = async () => {
+      const { count } = await supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("admin_unread", true);
+      if (live) setChatUnread(count || 0);
+    };
+    loadChats();
+    const stop = subscribeSupport(() => loadChats());
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
 
   useEffect(() => {
     if (live.last?.type === "user") setPulse((p) => ({ ...p, user: true }));
@@ -233,6 +250,11 @@ export default function Sidebar({ isCollapsed, closeSidebar }) {
         <NavLink to="/admin/home/contact" className={navItem} onClick={closeSidebar} title="Contact support">
           <MdSupportAgent className="text-[20px] shrink-0" />
           {!isCollapsed && <span>Contact support</span>}
+        </NavLink>
+        <NavLink to="/admin/home/chats" className={navItem} onClick={closeSidebar} title="Chat requests">
+          <MdChat className="text-[20px] shrink-0" />
+          {!isCollapsed && <span className="flex-1">Chat requests</span>}
+          <Pulse show={chatUnread > 0} />
         </NavLink>
 
         <SectionLabel collapsed={isCollapsed}>System</SectionLabel>

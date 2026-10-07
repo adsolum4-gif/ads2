@@ -2,13 +2,14 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 import { useDispatch, useSelector } from "react-redux";
 import { FaUserCircle } from "react-icons/fa";
-import { MdNotifications } from "react-icons/md";
+import { MdNotifications, MdSupportAgent } from "react-icons/md";
 import Sidebar from "./Sidebar";
 import AnnouncementModal from "./AnnouncementModal";
 import { announcementApi, authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess } from "../store/slices/profileSlice";
 import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
 import { supabase } from "@shared/supabase";
+import { subscribeSupport } from "@shared/supportChat";
 import { toast } from "sonner";
 
 export default function AppLayout() {
@@ -18,6 +19,7 @@ export default function AppLayout() {
   const unread = useSelector((s) => s.notifications.notifications.filter((n) => !n.is_read).length);
   const [announcement, setAnnouncement] = useState(null);
   const [show, setShow] = useState(false);
+  const [supportUnread, setSupportUnread] = useState(0);
 
   const openIfUnseen = async () => {
     try {
@@ -40,6 +42,20 @@ export default function AppLayout() {
       }
     })();
   }, [dispatch, user]);
+
+  useEffect(() => {
+    let live = true;
+    const loadSupport = async () => {
+      const { count } = await supabase.from("support_tickets").select("id", { count: "exact", head: true }).eq("user_unread", true);
+      if (live) setSupportUnread(count || 0);
+    };
+    loadSupport();
+    const stop = subscribeSupport(() => loadSupport());
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
 
   useEffect(() => {
     dispatch(fetchNotifications());
@@ -94,6 +110,14 @@ export default function AppLayout() {
             />
           </div>
           <div className="flex items-center justify-center space-x-3 text-gray-500">
+            <button type="button" onClick={() => navigate("/home/support")} className="relative p-1" aria-label="Support 24/7">
+              <MdSupportAgent className="text-2xl" />
+              {supportUnread > 0 && (
+                <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] px-1 bg-red-600 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {supportUnread > 9 ? "9+" : supportUnread}
+                </span>
+              )}
+            </button>
             <button type="button" onClick={() => navigate("/home/notifications")} className="relative p-1">
               <MdNotifications className="text-2xl" />
               {unread > 0 && (

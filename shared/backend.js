@@ -1151,12 +1151,32 @@ async function handle(method, url, body, params = {}) {
       "show_online_chat",
       "show_whatsapp",
       "show_telegram",
+      "support_tickets_per_day",
+      "support_messages_per_day",
+      "support_images_per_day",
+      "support_max_chars",
       "erc_address",
       "trc_address",
     ];
+    const supportInts = {
+      support_tickets_per_day: [0, 100],
+      support_messages_per_day: [0, 1000],
+      support_images_per_day: [0, 100],
+      support_max_chars: [10, 5000],
+    };
     const patch = {};
     allowed.forEach((k) => {
-      if (payload[k] != null) patch[k] = payload[k];
+      if (payload[k] == null) return;
+      if (supportInts[k]) {
+        const n = Number(payload[k]);
+        const [min, max] = supportInts[k];
+        if (!Number.isInteger(n) || n < min || n > max) {
+          fail(`${k.replaceAll("_", " ")} must be a whole number from ${min} to ${max}.`);
+        }
+        patch[k] = n;
+        return;
+      }
+      patch[k] = payload[k];
     });
     if (!Object.keys(patch).length) fail("No settings to update.");
     const { data, error } = await supabase.from("settings").update(patch).eq("id", 1).select().maybeSingle();

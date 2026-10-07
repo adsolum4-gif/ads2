@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { toast } from "sonner";
 import { FaUserCircle, FaCopy } from "react-icons/fa";
-import { MdChevronRight, MdLogout } from "react-icons/md";
+import { MdChevronRight, MdLogout, MdSupportAgent } from "react-icons/md";
 import { HiOutlineCreditCard } from "react-icons/hi";
 import { IoPersonOutline } from "react-icons/io5";
 import VipBadge, { vipLevel, vipMeta } from "../components/VipBadge";
@@ -124,6 +124,7 @@ export default function Profile() {
           <MenuRow icon={HiOutlineCreditCard} label="Payment Methods" onClick={() => navigate("/home/payment")} last />
         </div>
         <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+          <MenuRow icon={MdSupportAgent} label="Support 24/7" onClick={() => navigate("/home/support")} />
           <MenuRow icon={IoPersonOutline} label="Contact Us" onClick={() => navigate("/home/contact")} />
           <MenuRow icon={IoPersonOutline} label="Notifications" onClick={() => navigate("/home/notifications")} last />
         </div>
