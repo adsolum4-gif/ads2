@@ -43,18 +43,21 @@ function asJpegFile(blob, originalName) {
  * Shrink an image file to at most `maxBytes` (default 1MB) by lowering
  * JPEG quality, then dimensions if needed. GIFs and non-images are left as-is.
  */
-export async function compressImage(file, maxBytes = ONE_MB) {
+export async function compressImage(file, maxBytes = ONE_MB, options = {}) {
+  const force = options.force === true;
+  const edgeLimit = options.maxEdge || MAX_EDGE;
   if (!isImageBlob(file)) return file;
-  if (file.type === "image/gif" || file.type === "image/svg+xml") return file;
-  if (file.size <= maxBytes) return file;
+  if (file.type === "image/svg+xml") return file;
+  if (!force && (file.type === "image/gif" || file.size <= maxBytes)) return file;
+  if (force && file.type === "image/gif" && file.size <= maxBytes) return file;
 
   const source = await loadImage(file);
   let width = source.width || source.naturalWidth;
   let height = source.height || source.naturalHeight;
   if (!width || !height) return file;
 
-  if (Math.max(width, height) > MAX_EDGE) {
-    const scale = MAX_EDGE / Math.max(width, height);
+  if (Math.max(width, height) > edgeLimit) {
+    const scale = edgeLimit / Math.max(width, height);
     width = Math.max(1, Math.round(width * scale));
     height = Math.max(1, Math.round(height * scale));
   }

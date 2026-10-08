@@ -24,7 +24,7 @@ import {
   MdAccountBalanceWallet,
 } from "react-icons/md";
 import { supabase } from "@shared/supabase";
-import { subscribeSupport } from "@shared/supportChat";
+import { playIncomingChatSound, subscribeSupport } from "@shared/supportChat";
 import { clearUser } from "../store";
 import { useAdminLive } from "../live";
 
@@ -84,7 +84,10 @@ export default function Sidebar({ isCollapsed, closeSidebar }) {
       if (live) setChatUnread(count || 0);
     };
     loadChats();
-    const stop = subscribeSupport(() => loadChats());
+    const stop = subscribeSupport((kind, payload) => {
+      loadChats();
+      if (kind === "message" && payload.new?.sender_role === "user") playIncomingChatSound();
+    });
     return () => {
       live = false;
       stop();

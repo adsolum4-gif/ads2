@@ -8,7 +8,9 @@ import {
   fetchSupportQuota,
   formatChatDay,
   formatChatTime,
+  bindSupportTyping,
   markSupportSeen,
+  playIncomingChatSound,
   sendSupportMessage,
   subscribeSupport,
   supportLimits,
@@ -30,7 +32,9 @@ export default function Support() {
   const [lightbox, setLightbox] = useState(null);
   const [mobilePane, setMobilePane] = useState("list");
   const [myId, setMyId] = useState(null);
+  const [adminTyping, setAdminTyping] = useState(false);
   const endRef = useRef(null);
+  const typingTimer = useRef(null);
   const fileRef = useRef(null);
 
   const active = tickets.find((t) => t.id === activeId) || null;
@@ -95,6 +99,10 @@ export default function Support() {
       if (kind === "message") {
         const row = payload.new;
         if (!row?.id || row.ticket_id !== activeIdRef.current) return;
+        if (row.sender_role === "admin") {
+          playIncomingChatSound();
+          setAdminTyping(false);
+        }
         setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
         loadQuota();
       }
@@ -109,6 +117,23 @@ export default function Support() {
   activeIdRef.current = activeId;
 
   useEffect(() => {
+    if (!activeId) return undefined;
+    setAdminTyping(false);
+    const typing = bindSupportTyping(activeId, {
+      role: "user",
+      onTyping: () => {
+        setAdminTyping(true);
+        clearTimeout(typingTimer.current);
+        typingTimer.current = setTimeout(() => setAdminTyping(false), 2500);
+      },
+    });
+    return () => {
+      clearTimeout(typingTimer.current);
+      typing.stop();
+    };
+  }, [activeId]);
+
+  useEffect(() => {
     if (!activeId) return;
     setMessages([]);
     loadMessages(activeId).catch((err) => toast.error(err.message));
@@ -118,7 +143,7 @@ export default function Support() {
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "end" });
-  }, [messages, activeId, mobilePane]);
+  }, [messages, activeId, mobilePane, adminTyping]);
 
   const openTicket = (id) => {
     setCreating(false);
@@ -316,7 +341,7 @@ export default function Support() {
               </div>
               <div className="min-w-0 flex-1">
                 <p className="font-semibold text-gray-900 truncate">Adsterra Support</p>
-                <p className="text-xs text-gray-500 truncate">{active.status === "completed" ? "This issue has been resolved" : "Online · replies appear instantly"}</p>
+                <p className="text-xs text-gray-500 truncate">{active.status === "completed" ? "This issue has been resolved" : adminTyping ? "Support is typing…" : "Online · replies appear instantly"}</p>
               </div>
             </header>
             <div className="flex-1 overflow-y-auto px-3 py-4 space-y-3 min-h-0">
@@ -342,6 +367,11 @@ export default function Support() {
                   })}
                 </div>
               ))}
+              {adminTyping && active.status !== "completed" && (
+                <div className="flex justify-start">
+                  <div className="bg-white rounded-2xl rounded-bl-md px-3 py-2 text-sm text-gray-500 shadow-sm">Support is typing…</div>
+                </div>
+              )}
               <div ref={endRef} />
             </div>
             {active.status === "completed" ? (

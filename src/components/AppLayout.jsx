@@ -9,7 +9,7 @@ import { announcementApi, authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess } from "../store/slices/profileSlice";
 import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
 import { supabase } from "@shared/supabase";
-import { subscribeSupport } from "@shared/supportChat";
+import { playIncomingChatSound, subscribeSupport } from "@shared/supportChat";
 import { toast } from "sonner";
 
 export default function AppLayout() {
@@ -50,7 +50,10 @@ export default function AppLayout() {
       if (live) setSupportUnread(count || 0);
     };
     loadSupport();
-    const stop = subscribeSupport(() => loadSupport());
+    const stop = subscribeSupport((kind, payload) => {
+      loadSupport();
+      if (kind === "message" && payload.new?.sender_role === "admin") playIncomingChatSound();
+    });
     return () => {
       live = false;
       stop();

@@ -6,7 +6,9 @@ import { supabase } from "@shared/supabase";
 import {
   formatChatDay,
   formatChatTime,
+  bindSupportTyping,
   markSupportSeen,
+  playIncomingChatSound,
   sendSupportMessage,
   setSupportStatus,
   subscribeSupport,
@@ -52,6 +54,7 @@ export default function ChatRequests() {
   const endRef = useRef(null);
   const fileRef = useRef(null);
   const activeIdRef = useRef(null);
+  const typingRef = useRef(null);
 
   const active = tickets.find((t) => t.id === activeId) || null;
   activeIdRef.current = activeId;
@@ -111,6 +114,7 @@ export default function ChatRequests() {
         });
         if (payload.eventType === "INSERT") loadTickets();
       }
+      if (kind === "message" && payload.new?.sender_role === "user") playIncomingChatSound();
       if (kind === "message" && payload.new?.ticket_id === activeIdRef.current) {
         const row = payload.new;
         setMessages((prev) => (prev.some((m) => m.id === row.id) ? prev : [...prev, row]));
@@ -118,6 +122,13 @@ export default function ChatRequests() {
       if (kind === "message") loadTickets();
     });
   }, [loadTickets]);
+
+  useEffect(() => {
+    if (!activeId) return undefined;
+    const typing = bindSupportTyping(activeId, { role: "admin" });
+    typingRef.current = typing;
+    return () => typing.stop();
+  }, [activeId]);
 
   useEffect(() => {
     if (!activeId) return;
@@ -362,7 +373,10 @@ export default function ChatRequests() {
                     maxLength={maxChars}
                     rows={1}
                     placeholder="Reply"
-                    onChange={(e) => setComposer(e.target.value)}
+                    onChange={(e) => {
+                      setComposer(e.target.value);
+                      typingRef.current?.pulse();
+                    }}
                     onKeyDown={(e) => {
                       if (e.key === "Enter" && !e.shiftKey) {
                         e.preventDefault();

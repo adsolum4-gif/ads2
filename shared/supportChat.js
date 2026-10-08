@@ -6,7 +6,7 @@ export const SUPPORT_LIMITS = {
   messagesPerDay: 40,
   imagesPerDay: 5,
   maxChars: 500,
-  minTicketChars: 10,
+  minTicketChars: 4,
 };
 
 export function supportLimits(quota) {
@@ -66,7 +66,7 @@ export async function uploadSupportImage(file) {
   const userId = sessionData.session?.user?.id;
   if (!userId) throw new Error("Not authenticated");
   if (!String(file?.type || "").startsWith("image/")) throw new Error("Only photos and screenshots can be attached.");
-  const prepared = await compressImage(file, 1024 * 1024);
+  const prepared = await compressImage(file, 400 * 1024, { force: true, maxEdge: 1600 });
   if (prepared.size > 2 * 1024 * 1024) throw new Error("Image must be under 2MB.");
   const type = prepared.type || "image/jpeg";
   const ext = (type.split("/")[1] || "jpg").replace("jpeg", "jpg");
@@ -78,6 +78,62 @@ export async function uploadSupportImage(file) {
   if (error) throw new Error(error.message || "Could not upload the photo.");
   const { data } = supabase.storage.from("support-chat").getPublicUrl(path);
   return data.publicUrl;
+}
+
+let lastChatSoundAt = 0;
+let chatAudio;
+
+export function playIncomingChatSound() {
+  const now = Date.now();
+  if (now - lastChatSoundAt < 700) return;
+  lastChatSoundAt = now;
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return;
+    if (!chatAudio) chatAudio = new Ctx();
+    if (chatAudio.state === "suspended") chatAudio.resume();
+    const start = chatAudio.currentTime;
+    const osc = chatAudio.createOscillator();
+    const gain = chatAudio.createGain();
+    osc.type = "sine";
+    osc.frequency.setValueAtTime(880, start);
+    osc.frequency.exponentialRampToValueAtTime(620, start + 0.14);
+    gain.gain.setValueAtTime(0.0001, start);
+    gain.gain.exponentialRampToValueAtTime(0.07, start + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.28);
+    osc.connect(gain);
+    gain.connect(chatAudio.destination);
+    osc.start(start);
+    osc.stop(start + 0.3);
+  } catch {
+    /* browsers block sound until the page has been tapped */
+  }
+}
+
+export function bindSupportTyping(ticketId, { role, onTyping }) {
+  if (!ticketId) return { pulse() {}, stop() {} };
+  let ready = false;
+  let lastPulse = 0;
+  const channel = supabase.channel(`support-type:${ticketId}`, {
+    config: { broadcast: { self: false } },
+  });
+  channel.on("broadcast", { event: "typing" }, ({ payload }) => {
+    if (payload?.role && payload.role !== role) onTyping?.(payload.role);
+  });
+  channel.subscribe((status) => {
+    ready = status === "SUBSCRIBED";
+  });
+  return {
+    pulse() {
+      const now = Date.now();
+      if (!ready || now - lastPulse < 450) return;
+      lastPulse = now;
+      channel.send({ type: "broadcast", event: "typing", payload: { role } });
+    },
+    stop() {
+      supabase.removeChannel(channel);
+    },
+  };
 }
 
 export function subscribeSupport(onChange) {
