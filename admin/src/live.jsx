@@ -58,6 +58,9 @@ export function AdminLiveProvider({ children }) {
         .on("postgres_changes", { event: "*", schema: "public", table: "wallets" }, (payload) => {
           emit("hold", payload.new || payload.old, payload.eventType);
         })
+        .on("postgres_changes", { event: "*", schema: "public", table: "on_holds" }, (payload) => {
+          emit("hold", payload.new || payload.old, payload.eventType);
+        })
         .on("postgres_changes", { event: "*", schema: "public", table: "deposits" }, (payload) => {
           emit("deposit", payload.new || payload.old, payload.eventType);
         })

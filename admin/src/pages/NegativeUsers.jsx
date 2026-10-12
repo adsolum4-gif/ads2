@@ -28,7 +28,7 @@ import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
 import { useAdminLiveRefresh } from "../live";
-import { NEGATIVE_RANGES, vipLevelFromPack, maxRankOfAppearance, remainingAppearances } from "@shared/negativeRanges";
+import { vipLevelFromPack, maxRankOfAppearance, remainingAppearances } from "@shared/negativeRanges";
 
 function money(value) {
   const n = Number(value);
@@ -71,16 +71,33 @@ export default function NegativeUsers() {
   const [current, setCurrent] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [moneyDialog, setMoneyDialog] = useState(null);
+  const [holdRanges, setHoldRanges] = useState([]);
 
   const load = async (silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const [neg, all] = await Promise.all([
+      const [neg, all, holds] = await Promise.all([
         api.get(endpoints.NEGATIVE_USERS),
         api.get(endpoints.USERS, { params: { page_size: 200 } }),
+        api.get(endpoints.ON_HOLDS),
       ]);
       const n = unwrap(neg);
       const u = unwrap(all);
+      const holdsPayload = unwrap(holds);
+      const rangeRows = holdsPayload?.results
+        || holdsPayload?.data?.results
+        || (Array.isArray(holdsPayload) ? holdsPayload : []);
+      setHoldRanges(
+        (Array.isArray(rangeRows) ? rangeRows : [])
+          .filter((r) => r.is_active !== false && r.active !== false)
+          .map((r) => {
+            const min = Number(r.minimum_amount ?? r.min_amount);
+            const max = Number(r.maximum_amount ?? r.max_amount);
+            return { min, max, label: `${min}-${max}` };
+          })
+          .filter((r) => Number.isFinite(r.min) && Number.isFinite(r.max))
+          .sort((a, b) => a.min - b.min || a.max - b.max)
+      );
       setRows(n?.results || n?.data || n || []);
       setUsers(u?.results || u?.data || u || []);
       setError(false);
@@ -96,7 +113,7 @@ export default function NegativeUsers() {
   useAdminLiveRefresh(["user", "hold"], () => load(true));
 
   const selectedUser = users.find((u) => u.id === form.user_id) || null;
-  const selectedRange = NEGATIVE_RANGES.find((r) => r.min === Number(form.range_min) && r.max === Number(form.range_max)) || null;
+  const selectedRange = holdRanges.find((r) => r.min === Number(form.range_min) && r.max === Number(form.range_max)) || null;
   const selectedPack = selectedUser?.wallet?.package || selectedUser?.wallet?.packs;
   const selectedLevel = vipLevelFromPack(selectedPack);
   const vipRankCap = maxRankOfAppearance(selectedLevel);
@@ -106,7 +123,7 @@ export default function NegativeUsers() {
 
   const save = async () => {
     if (!form.user_id) return toast.error("Select a user.");
-    if (!form.range_min || !form.range_max) return toast.error("Select a penalty range.");
+    if (!selectedRange) return toast.error("Select a hold range. Deleted ranges are no longer available.");
     const products = Number(form.number_of_negative_products);
     const rank = Number(form.rank);
     if (!Number.isInteger(products) || products < 1) {
@@ -431,11 +448,12 @@ export default function NegativeUsers() {
             label="Select range"
             value={selectedRange ? `${selectedRange.min}-${selectedRange.max}` : ""}
             onChange={(e) => {
-              const next = NEGATIVE_RANGES.find((r) => `${r.min}-${r.max}` === e.target.value);
+              const next = holdRanges.find((r) => `${r.min}-${r.max}` === e.target.value);
               setForm({ ...form, range_min: next?.min || "", range_max: next?.max || "" });
             }}
+            helperText={holdRanges.length ? "Ranges come from On hold. A deleted range is removed from this list." : "No hold ranges yet. Add them under On hold."}
           >
-            {NEGATIVE_RANGES.map((r) => (
+            {holdRanges.map((r) => (
               <MenuItem key={r.label} value={`${r.min}-${r.max}`}>${r.label}</MenuItem>
             ))}
           </TextField>

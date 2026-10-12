@@ -255,7 +255,7 @@ export default function Holds() {
             {toDelete
               ? ` $${money(toDelete.minimum_amount ?? toDelete.min_amount)}–$${money(toDelete.maximum_amount ?? toDelete.max_amount)}`
               : ""}
-            . This cannot be undone.
+            . It will also disappear from the range list when adding a negative user. This cannot be undone.
           </p>
         </DialogContent>
         <DialogActions>
