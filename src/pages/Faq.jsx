@@ -57,7 +57,11 @@ const sections = [
     icon: FaLayerGroup,
     color: "text-teal-500",
     title: "VI. Combination Tasks",
-    items: ["Combination products may include multiple items, with higher returns.", "All funds are used for product trade submissions in combination tasks.", "Combination products cannot be canceled or skipped."],
+    items: [
+      "Combination tasks is a special products which may include multiple items, with higher returns.",
+      "All funds are used for product trade submissions in combination tasks(Special product).",
+      "Combination tasks or Special product cannot be canceled or skipped.",
+    ],
   },
   {
     icon: FaUniversity,

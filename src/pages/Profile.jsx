@@ -105,12 +105,13 @@ export default function Profile() {
           </div>
         </div>
 
-        <div className="border-t border-yellow-400/80 mt-4 pt-4 grid grid-cols-2 md:grid-cols-5 gap-3 text-sm">
+        <div className="border-t border-yellow-400/80 mt-4 pt-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
           <Stat label="Wallet Balance:" value={money(wallet.balance)} />
           <Stat label="On Hold Amount:" value={money(wallet.on_hold)} yellow />
           <Stat label="Commission:" value={money(wallet.commission ?? user.today_profit)} />
           <Stat label="Credit Score:" value={`${Number(wallet.credit_score ?? 0).toFixed(2)}%`} />
           <Stat label="Salary:" value={money(wallet.salary)} />
+          <Stat label="Referral earnings:" value={money(wallet.referral_earnings)} />
         </div>
       </motion.div>
 

@@ -109,9 +109,17 @@ export default function SignupOtp() {
     if (form.password.length < 6) return toast.error("Password must be at least 6 characters long");
     if (form.password !== form.confirmPassword) return toast.error("Passwords do not match");
     if (form.transactional_password.length !== 4) return toast.error("Transaction password must be exactly 4 digits");
-    if (!referralOpen && !form.invitation_code.trim()) return toast.error("Please enter an invitation code.");
-    if (!referralOpen && form.invitation_code.trim().length !== 4) return toast.error("Invitation code must be 4 digits.");
-    if (!referralOpen && form.invitation_code.trim() === "0000") return toast.error("Invalid invitation code.");
+    const inviteOrReferral = form.invitation_code.trim();
+    if (!referralOpen && !inviteOrReferral) return toast.error("Please enter a referral or invitation code.");
+    if (!referralOpen && /^[0-9]+$/.test(inviteOrReferral) && inviteOrReferral.length !== 4) {
+      return toast.error("Invitation codes must be exactly 4 digits.");
+    }
+    if (!referralOpen && /^[0-9]{4}$/.test(inviteOrReferral) && inviteOrReferral === "0000") {
+      return toast.error("Invalid invitation code.");
+    }
+    if (!referralOpen && !/^[0-9]{4}$/.test(inviteOrReferral) && inviteOrReferral.length < 4) {
+      return toast.error("Enter a valid member referral code.");
+    }
     if (!form.termsAccepted) return toast.error("Please accept the terms and conditions to continue");
     setLoading(true);
     const result = await authApi.signupWithOtp({
@@ -124,7 +132,7 @@ export default function SignupOtp() {
       last_name: form.last_name,
       gender: form.gender,
       transactional_password: form.transactional_password,
-      invitation_code: referralOpen ? "" : form.invitation_code.trim(),
+      invitation_code: referralOpen ? "" : inviteOrReferral,
       referral_token: referralOpen ? refToken : null,
     });
     setLoading(false);
@@ -250,7 +258,7 @@ export default function SignupOtp() {
                 <PasswordInput name="transactional_password" value={form.transactional_password} onChange={update} placeholder="Enter 4-digit code" maxLength={4} className={inputCls} required />
                 <p className="text-gray-500 text-xs mt-1">4-digit numeric code for transactions</p>
               </Field>
-              <Field label="Invitation Code" required={!referralOpen}>
+              <Field label="Referral / Invitation Code" required={!referralOpen}>
                 {referralOpen ? (
                   <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                     You are using an admin referral link. You do not need an invitation code. After you register, an invitation code will be sent to your notifications.
@@ -264,17 +272,21 @@ export default function SignupOtp() {
                         update({
                           target: {
                             name: "invitation_code",
-                            value: e.target.value.replace(/\D/g, "").slice(0, 4),
+                            value: e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 16),
                           },
                         })
                       }
-                      placeholder="4-digit code"
-                      inputMode="numeric"
-                      maxLength={4}
+                      placeholder="Member referral code or 4-digit invite"
+                      autoCapitalize="characters"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      maxLength={16}
                       className={inputCls}
                       required
                     />
-                    <p className="text-gray-500 text-xs mt-1">Enter a one-time invitation code from an admin or referrer</p>
+                    <p className="text-gray-500 text-xs mt-1">
+                      Use a member&apos;s referral code from their profile, or a 4-digit invitation code from admin/referrer.
+                    </p>
                   </>
                 )}
               </Field>

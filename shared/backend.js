@@ -277,7 +277,8 @@ async function handle(method, url, body, params = {}) {
       const { error: inErr } = await supabase.auth.signInWithPassword({ email: payload.email, password: payload.password });
       if (inErr) rpcError(inErr);
     }
-    if (!payload.referral_token && String(payload.invitation_code || "").trim() === "0000") {
+    const inviteOrReferral = String(payload.invitation_code || "").trim();
+    if (!payload.referral_token && /^[0-9]{4}$/.test(inviteOrReferral) && inviteOrReferral === "0000") {
       fail("Invalid invitation code");
     }
     const { data, error } = await supabase.rpc("complete_signup", {
