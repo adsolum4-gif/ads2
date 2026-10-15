@@ -1,5 +1,6 @@
 import { toast } from "sonner";
 import { createApi } from "@shared/backend";
+import { ensureFreshSession } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
 
 export const API_BASE = import.meta.env.VITE_SUPABASE_URL || "https://cfthacqhkkqzrbgqvckr.supabase.co";
@@ -37,6 +38,9 @@ export const authApi = {
       const user = payload.user;
       localStorage.setItem("accessToken", access_token);
       localStorage.setItem("refreshToken", refresh_token);
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+      }
       return { success: true, data: user, access_token, refresh_token };
     } catch (error) {
       const message = flattenMessage(error.response?.data?.message, "Login failed. Please try again.");
@@ -70,6 +74,9 @@ export const authApi = {
       const refresh_token = body.refresh_token || body.refresh;
       if (access_token) localStorage.setItem("accessToken", access_token);
       if (refresh_token) localStorage.setItem("refreshToken", refresh_token);
+      if (access_token && refresh_token) {
+        await supabase.auth.setSession({ access_token, refresh_token });
+      }
       return {
         success: true,
         data: user,
@@ -85,8 +92,9 @@ export const authApi = {
     try {
       const { data } = await api.get("/auth/me/");
       return { success: true, data: data.data || data };
-    } catch {
-      return { success: false, message: "Failed to fetch profile." };
+    } catch (error) {
+      const message = flattenMessage(error.response?.data?.message, "Failed to fetch profile.");
+      return { success: false, message, status: error.response?.status };
     }
   },
   fetchSettings: async () => {
@@ -117,10 +125,8 @@ export const authApi = {
 
 export async function refreshAccessToken() {
   try {
-    const { data, error } = await supabase.auth.refreshSession();
-    if (error || !data.session) throw error || new Error("No session");
-    localStorage.setItem("accessToken", data.session.access_token);
-    localStorage.setItem("refreshToken", data.session.refresh_token);
+    const session = await ensureFreshSession();
+    if (!session) throw new Error("No session");
     return { success: true };
   } catch {
     toast.error("Session expired. Please log in again.");

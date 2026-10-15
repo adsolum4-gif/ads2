@@ -73,6 +73,14 @@ export default function Starting() {
     return () => clearInterval(id);
   }, [slides.length]);
 
+  const commissionRate = useMemo(() => {
+    const fromGame = Number(currentGame?.profit_rate);
+    if (Number.isFinite(fromGame) && fromGame > 0) return fromGame;
+    const fromPack = Number(user?.wallet?.package?.profit_percentage);
+    if (Number.isFinite(fromPack) && fromPack > 0) return fromPack;
+    return null;
+  }, [currentGame?.profit_rate, user?.wallet?.package?.profit_percentage]);
+
   const reviewProducts = useMemo(() => {
     const assigned = (currentGame?.products || []).filter((p) => p && (p.name || p.image));
     if (assigned.length) return assigned;
@@ -402,6 +410,12 @@ export default function Starting() {
                   <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3.5">
                     <p className="text-[11px] uppercase tracking-wider text-red-400">Commission</p>
                     <p className="text-xl font-semibold text-red-600 mt-0.5">${money(currentGame.commission)}</p>
+                    {commissionRate != null && !(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
+                      <p className="text-[11px] text-red-500/90 mt-1 leading-snug">
+                        ${money(currentGame.amount)} × {Number(commissionRate).toFixed(2)}%
+                        {currentGame.pack_name ? ` (${currentGame.pack_name})` : ""}
+                      </p>
+                    )}
                   </div>
                 </div>
 

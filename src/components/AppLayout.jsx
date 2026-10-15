@@ -8,7 +8,9 @@ import AnnouncementModal from "./AnnouncementModal";
 import { announcementApi, authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess } from "../store/slices/profileSlice";
 import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
+import { setupAuthSessionSync } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
+import { logout } from "../store/slices/authSlice";
 import { playIncomingChatSound, subscribeSupport } from "@shared/supportChat";
 import { toast } from "sonner";
 
@@ -39,9 +41,25 @@ export default function AppLayout() {
         dispatch(fetchProfileStart());
         const result = await authApi.fetchProfile();
         if (result.success) dispatch(fetchProfileSuccess(result.data));
+        else if (result.status === 401 || /session|authenticated|log in/i.test(result.message || "")) {
+          dispatch(logout());
+          navigate("/login", { replace: true });
+        }
       }
     })();
-  }, [dispatch, user]);
+  }, [dispatch, navigate, user]);
+
+  useEffect(() => {
+    if (!localStorage.getItem("accessToken")) return undefined;
+    return setupAuthSessionSync({
+      isAdmin: false,
+      onExpired: () => {
+        dispatch(logout());
+        toast.error("Session expired. Please log in again.");
+        navigate("/login", { replace: true });
+      },
+    });
+  }, [dispatch, navigate]);
 
   useEffect(() => {
     let live = true;

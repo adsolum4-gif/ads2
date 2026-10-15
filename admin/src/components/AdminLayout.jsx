@@ -10,6 +10,8 @@ import { AdminLiveProvider, useAdminLive } from "../live";
 import { clearUser, toggleSidebar } from "../store";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
+import { toast } from "sonner";
+import { setupAuthSessionSync } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
 
 export default function AdminLayout() {
@@ -60,6 +62,18 @@ function AdminShell() {
     if (!live.version) return;
     loadNotifs();
   }, [live.version]);
+
+  useEffect(() => {
+    if (!user?.access_token) return undefined;
+    return setupAuthSessionSync({
+      isAdmin: true,
+      onExpired: () => {
+        dispatch(clearUser());
+        toast.error("Session expired. Please sign in again.");
+        navigate("/admin", { replace: true });
+      },
+    });
+  }, [dispatch, navigate, user?.access_token]);
 
   const unread = notifs.filter((n) => !n.is_read).length;
 

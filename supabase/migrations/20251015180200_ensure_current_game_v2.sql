@@ -38,7 +38,7 @@ BEGIN
   SELECT * INTO v_prof FROM public.profiles WHERE id = v_uid;
   IF NOT v_prof.is_active THEN RAISE EXCEPTION 'Account is inactive'; END IF;
   SELECT * INTO v_wallet FROM public.wallets WHERE user_id = v_uid;
-  SELECT * INTO v_pack FROM public.packs WHERE id = v_wallet.package_id;
+  SELECT * INTO v_pack FROM public.resolve_user_pack(v_uid);
   SELECT * INTO v_settings FROM public.settings WHERE id = 1;
   IF v_prof.current_number_count >= v_prof.total_number_can_play THEN
     RAISE EXCEPTION 'You have completed all tasks for today';
@@ -205,9 +205,11 @@ BEGIN
       WHERE id = v_game.id
       RETURNING * INTO v_game;
     ELSIF NOT v_special THEN
+      v_commission := round(v_game.amount * coalesce(v_pack.profit_percentage, 0.5) / 100.0, 2);
       UPDATE public.games
         SET special_product = false,
-            penalty_hold = 0
+            penalty_hold = 0,
+            commission = v_commission
       WHERE id = v_game.id
       RETURNING * INTO v_game;
     END IF;
@@ -247,11 +249,19 @@ BEGIN
 
   v_remaining := CASE WHEN coalesce(v_wallet.on_hold, 0) < 0 THEN abs(v_wallet.on_hold) ELSE 0 END;
 
+  IF coalesce(v_game.special_product, false) THEN
+    v_rate := GREATEST(coalesce(v_pack.profit_percentage, 0.5) * coalesce(v_pack.grouped_multiplier, 10), 5);
+  ELSE
+    v_rate := coalesce(v_pack.profit_percentage, 0.5);
+  END IF;
+
   RETURN jsonb_build_object(
     'id', v_game.id,
     'products', v_products,
     'amount', v_game.amount,
     'commission', v_game.commission,
+    'profit_rate', v_rate,
+    'pack_name', v_pack.name,
     'created_at', v_game.created_at,
     'rating_no', v_game.rating_no,
     'pending', v_game.pending,

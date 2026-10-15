@@ -1,5 +1,6 @@
 import { supabase } from "./supabase";
 import { compressImage, isUploadFile } from "./compressImage";
+import { emitSessionExpired, ensureFreshSession } from "./authSession";
 
 export const API_BASE = SUPABASE_PLACEHOLDER();
 
@@ -52,19 +53,6 @@ async function uploadFile(bucket, file, prefix = "") {
   return data.publicUrl;
 }
 
-function storedTokens() {
-  if (typeof localStorage === "undefined") return {};
-  try {
-    const admin = JSON.parse(localStorage.getItem("adminUser") || "null") || {};
-    return {
-      access: admin.access_token || admin.access || localStorage.getItem("accessToken"),
-      refresh: admin.refresh_token || admin.refresh || localStorage.getItem("refreshToken"),
-    };
-  } catch {
-    return {};
-  }
-}
-
 function asObject(value) {
   if (value == null) return {};
   if (typeof value === "string") {
@@ -78,16 +66,9 @@ function asObject(value) {
 }
 
 async function requireSession() {
-  let { data } = await supabase.auth.getSession();
-  if (!data.session) {
-    const { access, refresh } = storedTokens();
-    if (access && refresh) {
-      const restored = await supabase.auth.setSession({ access_token: access, refresh_token: refresh });
-      if (!restored.error) data = restored.data;
-    }
-  }
-  if (!data.session) fail("Not authenticated", { status: 401 });
-  return data.session;
+  const session = await ensureFreshSession();
+  if (!session) fail("Session expired. Please log in again.", { status: 401 });
+  return session;
 }
 
 async function requireAdmin() {
@@ -1339,6 +1320,7 @@ export function createApi() {
       if (!error.response) {
         error.response = { status: 500, data: { message: error.message } };
       }
+      if (error.response?.status === 401) emitSessionExpired();
       throw error;
     }
   };
