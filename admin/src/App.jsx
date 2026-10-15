@@ -10,6 +10,7 @@ import NegativeUsers from "./pages/NegativeUsers";
 import Deposits from "./pages/Deposits";
 import Withdrawals from "./pages/Withdrawals";
 import Holds from "./pages/Holds";
+import ClearOnHold from "./pages/ClearOnHold";
 import Packs from "./pages/Packs";
 import Products from "./pages/Products";
 import Events from "./pages/Events";
@@ -50,6 +51,7 @@ export default function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="hold" element={<Holds />} />
+          <Route path="clear-on-hold" element={<ClearOnHold />} />
           <Route path="allusers" element={<AllUsers />} />
           <Route path="negusers" element={<NegativeUsers />} />
           <Route path="negative" element={<NegativeUsers />} />

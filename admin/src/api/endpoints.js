@@ -45,6 +45,7 @@ export const endpoints = {
   TOGGLE_NEGATIVE: (id) => `/site_admin/negative-users/${id}/toggle/`,
   ON_HOLDS: "/site_admin/onholds/",
   USER_HOLDS: "/site_admin/user-holds/",
+  CLEAR_USER_ON_HOLD: "/site_admin/user-holds/clear/",
   ON_HOLD: (id) => `/site_admin/onholds/${id}/`,
   WITHDRAWALS: "/site_admin/withdrawals/",
   WITHDRAWAL_STATUS: (id) => `/site_admin/withdrawals/${id}/update-status/`,

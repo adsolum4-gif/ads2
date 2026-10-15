@@ -22,6 +22,7 @@ import {
   MdShare,
   MdPayments,
   MdAccountBalanceWallet,
+  MdLockOpen,
 } from "react-icons/md";
 import { supabase } from "@shared/supabase";
 import { playIncomingChatSound, subscribeSupport } from "@shared/supportChat";
@@ -149,7 +150,11 @@ export default function Sidebar({ isCollapsed, closeSidebar }) {
         </NavLink>
         <NavLink to="/admin/home/hold" className={navItem} onClick={closeSidebar} title="On hold">
           <MdPauseCircle className="text-[20px] shrink-0" />
-          {!isCollapsed && <span>On hold</span>}
+          {!isCollapsed && <span>On hold ranges</span>}
+        </NavLink>
+        <NavLink to="/admin/home/clear-on-hold" className={navItem} onClick={closeSidebar} title="Clear on-hold balances">
+          <MdLockOpen className="text-[20px] shrink-0" />
+          {!isCollapsed && <span>Clear on-hold</span>}
         </NavLink>
 
         <SectionLabel collapsed={isCollapsed}>People</SectionLabel>

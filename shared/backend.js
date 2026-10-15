@@ -1032,6 +1032,15 @@ async function handle(method, url, body, params = {}) {
     const users = Array.isArray(holds.data) ? holds.data : holds.data || [];
     return { data: users, results: users, users };
   }
+  if (path === "/site_admin/user-holds/clear" && m === "POST") {
+    await requireAdmin();
+    const { data, error } = await supabase.rpc("admin_clear_user_on_hold", {
+      p_user_id: payload.user_id,
+    });
+    if (error) rpcError(error);
+    await logAdmin(`Cleared on-hold for user ${data?.username || payload.user_id}`);
+    return { success: true, data };
+  }
   if (path === "/site_admin/onholds" && m === "POST") {
     const min = Number(payload.minimum_amount || payload.min_amount || 0);
     const max = Number(payload.maximum_amount || payload.max_amount || 0);

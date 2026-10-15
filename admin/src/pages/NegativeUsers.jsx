@@ -138,8 +138,9 @@ export default function NegativeUsers() {
     if (leftToday != null && leftToday < 1) {
       return toast.error("This user has no product appearances left today.");
     }
-    if (leftToday != null && rank > leftToday) {
-      return toast.error(`This user has ${leftToday} appearances left today. Rank cannot be higher than that.`);
+    const windowTasks = leftToday != null ? Math.min(rank, leftToday) : rank;
+    if (leftToday != null && leftToday >= rank && products > windowTasks) {
+      return toast.error(`Cannot place ${products} special products in a window of only ${windowTasks} upcoming tasks.`);
     }
     setSaving(true);
     try {
@@ -150,9 +151,17 @@ export default function NegativeUsers() {
         number_of_negative_products: form.number_of_negative_products,
         rank: form.rank,
       };
-      if (current) await api.patch(endpoints.NEGATIVE_USER(current.id), body);
-      else await api.post(endpoints.NEGATIVE_USERS, body);
-      toast.success(current ? "Negative user updated." : "Negative user added. The special product will appear once in the rank window.");
+      const res = current
+        ? await api.patch(endpoints.NEGATIVE_USER(current.id), body)
+        : await api.post(endpoints.NEGATIVE_USERS, body);
+      const info = unwrap(res) || {};
+      if (info.scheduled_for_next_reset) {
+        toast.warning(info.message || "Scheduled for the next daily reset.");
+      } else if (info.message) {
+        toast.success(info.message);
+      } else {
+        toast.success(current ? "Negative user updated." : "Negative user added.");
+      }
       setOpen(false);
       setCurrent(null);
       load();
@@ -307,13 +316,24 @@ export default function NegativeUsers() {
                           body:
                             r.is_negative !== false
                               ? `This will clear ${r.username}'s on-hold penalty. Their actual wallet balance will stay the same.`
-                              : `This will turn the penalty back on. The special product will appear once in the rank window. Their actual wallet balance will stay the same.`,
+                              : `This will turn the penalty back on. Special tasks will run in the configured rank window. Wallet balance is unchanged until the user tops up a special slice.`,
                         })
                       }
                     />
                   </TableCell>
                   <TableCell>{r.number_of_negative_products}</TableCell>
-                  <TableCell>{r.rank}</TableCell>
+                  <TableCell>
+                    {r.scheduled_for_next_reset ? (
+                      <span className="text-amber-700 font-medium">Scheduled (reset)</span>
+                    ) : (
+                      <>
+                        {r.rank}
+                        {r.window_start != null && r.window_end != null ? (
+                          <span className="block text-xs text-gray-500">Tasks {r.window_start}–{r.window_end}</span>
+                        ) : null}
+                      </>
+                    )}
+                  </TableCell>
                   <TableCell sx={{ color: Number(r.balance) < 0 ? "#d32f2f" : "inherit", fontWeight: 600 }}>
                     ${money(r.balance)}
                   </TableCell>
@@ -463,7 +483,7 @@ export default function NegativeUsers() {
             inputMode="numeric"
             value={form.number_of_negative_products}
             onChange={(e) => setForm({ ...form, number_of_negative_products: digitsOnly(e.target.value) })}
-            helperText="How many pictures show on that one special review. Regular products always show one picture."
+            helperText="How many separate special tasks appear inside the rank window (each with its own top-up slice)."
           />
           <TextField
             label="Rank of appearance"
@@ -473,8 +493,8 @@ export default function NegativeUsers() {
             onChange={(e) => setForm({ ...form, rank: digitsOnly(e.target.value) })}
             helperText={
               selectedUser
-                ? `VIP ${selectedLevel} max is ${vipRankCap}. Window starts after ${doneToday}/${totalToday || "\u2014"} and the special product appears once in that window.`
-                : "The special product appears once inside this window. Max grows by 10 each VIP level (VIP 3 = 50)."
+                ? `VIP ${selectedLevel} max is ${vipRankCap}. Next ${form.rank || "N"} tasks from ${doneToday}/${totalToday || "\u2014"}.`
+                : "Size of the upcoming task window. Max grows by 10 each VIP level (VIP 3 = 50)."
             }
           />
           {selectedUser && (
@@ -483,11 +503,16 @@ export default function NegativeUsers() {
                 <strong>{selectedUser.username}</strong> is VIP {selectedLevel}. Completed {doneToday}/{totalToday} tasks today.
               </p>
               <p className="mt-1">
-                <strong>{leftToday}</strong> product appearances left today. Rank cannot exceed {Math.min(vipRankCap, leftToday)}.
+                <strong>{leftToday}</strong> appearances left today.
+                {leftToday != null && form.rank && leftToday < Number(form.rank) ? (
+                  <span> Fewer than rank {form.rank} — saving will <strong>schedule for the next daily reset</strong>.</span>
+                ) : null}
               </p>
               <p className="mt-1 text-amber-900">
-                From {doneToday}/{totalToday || 0}, rank {form.rank || "\u2014"} sets the window starting at task {doneToday + 1}
-                {form.rank ? ` through ${doneToday + Number(form.rank)}` : ""}. The special product appears once in that window, with {form.number_of_negative_products || "N"} picture{Number(form.number_of_negative_products) === 1 ? "" : "s"}. Special amount is a value inside the selected range.
+                Window: tasks {doneToday + 1}
+                {form.rank ? `–${Math.min(doneToday + Number(form.rank), totalToday || doneToday + Number(form.rank))}` : ""}.{" "}
+                <strong>{form.number_of_negative_products || "N"}</strong> special task{Number(form.number_of_negative_products) === 1 ? "" : "s"} on random slots in that window.
+                Total amount is picked from the range and split randomly across those specials; each hit shows balance + slice and requires clearing the slice.
               </p>
             </div>
           )}
