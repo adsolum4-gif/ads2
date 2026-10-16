@@ -368,9 +368,17 @@ export default function Starting() {
                       </div>
                       <div className="px-2 py-2 text-center">
                         <p className="text-[11px] sm:text-xs font-semibold text-gray-800 leading-tight line-clamp-2 min-h-[2rem]">{p.name}</p>
-                        {p.price != null && !(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
-                          <p className="text-[11px] font-bold text-red-600 mt-1">${money(p.price)}</p>
-                        )}
+                        {(() => {
+                          const isSpecial = currentGame.special_product || Number(currentGame.penalty_hold) > 0;
+                          const linePrice = isSpecial ? (p.price ?? currentGame.amount) : p.price;
+                          if (linePrice == null) return null;
+                          return (
+                            <p className="text-[11px] font-bold text-red-600 mt-1">
+                              ${money(linePrice)}
+                              {isSpecial && <span className="block text-[10px] font-medium text-amber-700/90">Combination task value</span>}
+                            </p>
+                          );
+                        })()}
                       </div>
                     </div>
                   ))}
@@ -410,7 +418,7 @@ export default function Starting() {
                   <div className="rounded-2xl bg-red-50 border border-red-100 px-4 py-3.5">
                     <p className="text-[11px] uppercase tracking-wider text-red-400">Commission</p>
                     <p className="text-xl font-semibold text-red-600 mt-0.5">${money(currentGame.commission)}</p>
-                    {commissionRate != null && !(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
+                    {commissionRate != null && !currentGame?.special_product && (
                       <p className="text-[11px] text-red-500/90 mt-1 leading-snug">
                         ${money(currentGame.amount)} × {Number(commissionRate).toFixed(2)}%
                         {currentGame.pack_name ? ` (${currentGame.pack_name})` : ""}

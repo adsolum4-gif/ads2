@@ -32,6 +32,7 @@ DECLARE
   v_has_special_catalog boolean := false;
   v_n_specials int := 0;
   v_slice numeric := 0;
+  v_pick_target numeric := 0;
 BEGIN
   IF v_uid IS NULL THEN RAISE EXCEPTION 'Not authenticated'; END IF;
   PERFORM public.ensure_daily_reset();
@@ -145,15 +146,25 @@ BEGIN
     END IF;
   END IF;
 
+  v_pick_target := round(coalesce(v_amount, v_game.amount, 0), 2);
+
   IF NOT v_has_game OR v_count = 0 OR v_count <> v_pic OR v_wrong_pool
      OR (v_special IS TRUE AND coalesce(v_game.special_product, false) IS NOT TRUE) THEN
     IF v_special THEN
       SELECT array_agg(id) INTO v_ids FROM (
-        SELECT id FROM public.products WHERE is_active AND is_special IS TRUE ORDER BY random() LIMIT v_pic
+        SELECT id
+        FROM public.products
+        WHERE is_active AND is_special IS TRUE
+        ORDER BY abs(coalesce(price, 0) - v_pick_target), random()
+        LIMIT v_pic
       ) s;
       IF v_ids IS NULL THEN
         SELECT array_agg(id) INTO v_ids FROM (
-          SELECT id FROM public.products WHERE is_active AND coalesce(is_special, false) IS NOT TRUE ORDER BY random() LIMIT v_pic
+          SELECT id
+          FROM public.products
+          WHERE is_active AND coalesce(is_special, false) IS NOT TRUE
+          ORDER BY abs(coalesce(price, 0) - v_pick_target), random()
+          LIMIT v_pic
         ) s;
       END IF;
     ELSE
@@ -238,7 +249,12 @@ BEGIN
 
   SELECT coalesce(
     jsonb_agg(
-      jsonb_build_object('id', pr.id, 'image', pr.image, 'name', pr.name, 'price', pr.price)
+      jsonb_build_object(
+        'id', pr.id,
+        'image', pr.image,
+        'name', pr.name,
+        'price', CASE WHEN coalesce(v_game.special_product, false) THEN v_game.amount ELSE pr.price END
+      )
       ORDER BY random()
     ),
     '[]'::jsonb

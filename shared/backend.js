@@ -165,6 +165,15 @@ async function hydrateGameProducts(raw) {
       .eq("game_id", game.id);
     products = (rows || []).map((r) => r.products).filter(Boolean);
   }
+  if (game.special_product && products.length) {
+    const taskAmount = Number(game.amount);
+    products = products.map((p) => {
+      const catalog = Number(p.price);
+      if (Number.isFinite(catalog) && catalog > 0) return p;
+      if (Number.isFinite(taskAmount)) return { ...p, price: taskAmount };
+      return p;
+    });
+  }
   return { ...game, products };
 }
 
@@ -501,6 +510,7 @@ async function handle(method, url, body, params = {}) {
       name: payload.name,
       price: payload.price || 0,
       rating_number: payload.rating_number || 5,
+      is_special: payload.is_special === true || payload.is_special === "true",
       image,
     });
     if (error) rpcError(error);
@@ -517,6 +527,9 @@ async function handle(method, url, body, params = {}) {
     }
     const image = payload.image instanceof File ? await uploadFile("products", payload.image, "img/") : undefined;
     const patch = { name: payload.name, price: payload.price, rating_number: payload.rating_number };
+    if (payload.is_special != null) {
+      patch.is_special = payload.is_special === true || payload.is_special === "true";
+    }
     if (image) patch.image = image;
     Object.keys(patch).forEach((k) => patch[k] == null && delete patch[k]);
     const { error } = await supabase.from("products").update(patch).eq("id", id);

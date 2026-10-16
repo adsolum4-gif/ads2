@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { specialCatalogImageForName } from "@shared/specialCatalogImages";
 
 const BY_NAME = {
   "Wireless Earbuds": "/assets/products/earbuds.jpg",
@@ -58,8 +59,9 @@ const BY_NAME = {
 
 export default function ProductImage({ src, name, alt, className = "" }) {
   const candidates = useMemo(() => {
+    const thematic = specialCatalogImageForName(name);
     const mapped = name ? BY_NAME[name] : null;
-    return [...new Set([src, mapped].filter(Boolean))];
+    return [...new Set([thematic, src, mapped].filter(Boolean))];
   }, [src, name]);
   const [index, setIndex] = useState(0);
   useEffect(() => {
@@ -80,6 +82,8 @@ export default function ProductImage({ src, name, alt, className = "" }) {
       src={current}
       alt={alt || name || "Product"}
       className={className}
+      loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => setIndex((i) => i + 1)}
     />
   );

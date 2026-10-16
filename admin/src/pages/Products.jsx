@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
-  Button, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
-  Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination,
+  Button, Checkbox, CircularProgress, Dialog, DialogActions, DialogContent, DialogTitle,
+  FormControlLabel, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TablePagination,
   TableRow, TextField,
 } from "@mui/material";
 import { format } from "date-fns";
@@ -9,6 +9,7 @@ import { toast } from "sonner";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
+import { specialCatalogImageForName } from "@shared/specialCatalogImages";
 
 function productNumberFromName(name) {
   const m = String(name || "").match(/product\s*#?\s*(\d+)\s*$/i);
@@ -84,6 +85,7 @@ export default function Products() {
     try {
       const body = new FormData();
       ["name", "price", "rating_number"].forEach((k) => form[k] != null && body.append(k, form[k]));
+      body.append("is_special", form.is_special ? "true" : "false");
       if (form.image instanceof File) body.append("image", form.image);
       if (mode === "add") {
         await api.post(endpoints.PRODUCTS, body);
@@ -138,13 +140,13 @@ export default function Products() {
         <Table>
           <TableHead>
             <TableRow>
-              {["#", "Name", "Price", "Rating Number", "Created On", "Image", "Action"].map((h) => <TableCell key={h}>{h}</TableCell>)}
+              {["#", "Name", "Price", "Special", "Rating Number", "Created On", "Image", "Action"].map((h) => <TableCell key={h}>{h}</TableCell>)}
             </TableRow>
           </TableHead>
           <TableBody>
             {filtered.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 4, color: "text.secondary" }}>
+                <TableCell colSpan={8} align="center" sx={{ py: 4, color: "text.secondary" }}>
                   {rows.length === 0 ? "No products yet." : "No products match your search."}
                 </TableCell>
               </TableRow>
@@ -154,10 +156,17 @@ export default function Products() {
                 <TableCell>{page * per + i + 1}</TableCell>
                 <TableCell>{r.name}</TableCell>
                 <TableCell>{r.price}</TableCell>
+                <TableCell>{r.is_special ? "Yes" : "—"}</TableCell>
                 <TableCell>{r.rating_number ?? r.rating_no}</TableCell>
                 <TableCell>{r.created_at ? format(new Date(r.created_at), "dd MMM yyyy") : ""}</TableCell>
                 <TableCell>
-                  <img src={r.image} alt={r.name} className="object-cover w-8 h-8 border rounded cursor-pointer" onClick={() => setPreview(r.image)} />
+                  <img
+                    src={specialCatalogImageForName(r.name) || r.image}
+                    alt={r.name}
+                    className="object-cover w-8 h-8 border rounded cursor-pointer"
+                    referrerPolicy="no-referrer"
+                    onClick={() => setPreview(specialCatalogImageForName(r.name) || r.image)}
+                  />
                 </TableCell>
                 <TableCell className="flex gap-2">
                   <Button size="small" variant="contained" color="secondary" onClick={() => { setMode("update"); setForm(r); setOpen(true); }}>Update</Button>
@@ -175,6 +184,15 @@ export default function Products() {
         <DialogContent className="grid grid-cols-2 gap-4 mt-2">
           <TextField label="Name" fullWidth value={form.name || ""} onChange={(e) => setForm({ ...form, name: e.target.value })} />
           <TextField label="Price" type="number" fullWidth value={form.price || ""} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={!!form.is_special}
+                onChange={(e) => setForm({ ...form, is_special: e.target.checked })}
+              />
+            }
+            label="Special catalog item (luxury pool)"
+          />
           <Button variant="outlined" component="label">
             Choose File
             <input hidden type="file" accept="image/*" onChange={(e) => setForm({ ...form, image: e.target.files[0] })} />

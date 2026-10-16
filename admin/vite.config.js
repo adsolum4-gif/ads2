@@ -11,5 +11,5 @@ export default defineConfig({
   resolve: {
     alias: { "@shared": path.join(root, "shared") },
   },
-  server: { port: 5174, host: true },
+  server: { port: 5174, host: "0.0.0.0", strictPort: false },
 });
