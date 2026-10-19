@@ -247,24 +247,38 @@ async function handle(method, url, body, params = {}) {
   if (m === "POST" && path === "/auth/send_otp") {
     const email = String(payload.email || "").trim().toLowerCase();
     if (!email) fail("Please enter your email address.");
-    const testing = {
-      success: true,
-      emailed: false,
-      message: "Email sending needs a domain. For testing, enter 123456.",
-    };
     try {
       const { data, error } = await supabase.functions.invoke("send-otp", { body: { email } });
-      if (error || data?.success === false) return testing;
-      if (data?.emailed) {
+      if (error) {
         return {
-          success: true,
-          emailed: true,
-          message: data.message || "OTP sent. If it does not arrive, enter 123456.",
+          success: false,
+          emailed: false,
+          message: error.message || "Failed to send verification code. Please try again.",
         };
       }
-      return testing;
-    } catch {
-      return testing;
+      if (data?.success === false) {
+        return {
+          success: false,
+          emailed: false,
+          message: data.message || "Failed to send verification code.",
+        };
+      }
+      return {
+        success: true,
+        emailed: Boolean(data?.emailed),
+        message:
+          data?.message ||
+          (data?.emailed
+            ? `We sent a 6-digit code to ${email}.`
+            : "Verification code created. Check your email or contact support if it does not arrive."),
+        data,
+      };
+    } catch (err) {
+      return {
+        success: false,
+        emailed: false,
+        message: err?.message || "Failed to send verification code. Please try again.",
+      };
     }
   }
 
@@ -976,16 +990,14 @@ async function handle(method, url, body, params = {}) {
     const id = depStatus[1];
     const { data: dep, error: fetchErr } = await supabase.from("deposits").select("*").eq("id", id).single();
     if (fetchErr) rpcError(fetchErr);
-    const { error } = await supabase.from("deposits").update({ status: payload.status }).eq("id", id);
+    const prevStatus = dep.status;
+    const nextStatus = payload.status;
+    const { error } = await supabase.from("deposits").update({ status: nextStatus }).eq("id", id);
     if (error) rpcError(error);
-    if (payload.status === "Confirmed" && dep.status !== "Confirmed") {
-      const amount = Number(dep.amount || 0).toFixed(2);
-      await supabase.from("notifications").insert({
-        user_id: dep.user_id,
-        title: "Deposit confirmed",
-        message: `Your deposit of $${amount} has been confirmed and credited to your wallet.`,
-        is_read: false,
-      });
+    // Wallet, on_hold, and notifications are handled by private.apply_confirmed_deposit trigger.
+    // Belt-and-suspenders: drop stale confirmation notices when unconfirming.
+    if (prevStatus === "Confirmed" && nextStatus !== "Confirmed") {
+      await supabase.from("notifications").delete().eq("deposit_id", id);
     }
     await logAdmin(`Deposit ${payload.status}`, payload.admin_password ? "verified" : "");
     return { success: true };

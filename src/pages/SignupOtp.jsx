@@ -40,6 +40,7 @@ export default function SignupOtp() {
   const [loading, setLoading] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [referralOpen, setReferralOpen] = useState(false);
+  const [otpDeliveryHint, setOtpDeliveryHint] = useState("");
 
   const update = (e) => {
     const { name, value, type, checked } = e.target;
@@ -68,7 +69,13 @@ export default function SignupOtp() {
     const result = await authApi.sendOtp(form.email);
     setLoading(false);
     if (result.success) {
-      toast.success(result.message || "OTP resent successfully!");
+      const hint =
+        result.message ||
+        (result.emailed
+          ? `We sent a 6-digit code to ${form.email}. Check your inbox and spam folder.`
+          : "Enter the 6-digit code from your email to continue.");
+      setOtpDeliveryHint(hint);
+      toast.success(hint);
       setStep(2);
       setCooldown(60);
       const timer = setInterval(() => {
@@ -183,7 +190,8 @@ export default function SignupOtp() {
         {step === 2 && (
           <div className="space-y-4">
             <p className="text-gray-600 text-center">
-              Email delivery needs a domain, so codes are not sent yet. Enter <span className="font-bold">123456</span> to continue testing.
+              {otpDeliveryHint ||
+                `Enter the 6-digit code we sent to ${form.email || "your email"}. It expires in 10 minutes.`}
             </p>
             <input
               type="text"

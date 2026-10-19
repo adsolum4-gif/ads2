@@ -180,16 +180,6 @@ BEGIN
       ) s;
       IF v_ids IS NULL THEN
         SELECT array_agg(id) INTO v_ids FROM (
-          SELECT pr.id
-          FROM public.products pr
-          WHERE pr.is_active AND pr.is_special IS TRUE
-            AND pr.id NOT IN (SELECT public.special_product_ids_issued_to_user(v_uid, v_exclude_game))
-          ORDER BY random()
-          LIMIT v_pic
-        ) s;
-      END IF;
-      IF v_ids IS NULL THEN
-        SELECT array_agg(id) INTO v_ids FROM (
           SELECT id
           FROM public.products
           WHERE is_active AND coalesce(is_special, false) IS NOT TRUE

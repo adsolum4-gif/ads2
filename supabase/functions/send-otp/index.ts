@@ -28,7 +28,8 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
     const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
     const resendKey = Deno.env.get("RESEND_API_KEY") || Deno.env.get("RESEND_API_KEY_ADS") || "";
-    const from = Deno.env.get("RESEND_FROM") || "Adsterra <onboarding@resend.dev>";
+    const rawFrom = Deno.env.get("RESEND_FROM") || "Adsterra <onboarding@resend.dev>";
+    const from = rawFrom.replace(/^["']+|["']+$/g, "").trim();
 
     if (!serviceKey) return json({ success: false, message: "Email service is not configured." }, 500);
 
@@ -87,10 +88,10 @@ Deno.serve(async (req) => {
     }
 
     return json({
-      success: true,
+      success: false,
       emailed: false,
-      message: "OTP created, but the email could not be sent. Enter 123456 to continue testing.",
-    });
+      message: errText || "Could not send email. Check RESEND_FROM matches your verified domain.",
+    }, 502);
   } catch (error) {
     return json({ success: false, message: error?.message || "Failed to send OTP." }, 500);
   }

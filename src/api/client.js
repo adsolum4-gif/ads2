@@ -52,7 +52,12 @@ export const authApi = {
     try {
       const { data } = await api.post("/auth/send_otp/", { email });
       const payload = data.data || data;
-      return { success: true, data: payload, message: payload.message || data.message || "OTP sent." };
+      return {
+        success: true,
+        emailed: Boolean(payload.emailed ?? data.emailed),
+        data: payload,
+        message: payload.message || data.message || "OTP sent.",
+      };
     } catch (error) {
       return { success: false, message: flattenMessage(error.response?.data?.message, "Failed to send OTP. Please try again.") };
     }
