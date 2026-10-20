@@ -111,7 +111,7 @@ export default function Starting() {
       dispatch(fetchNotifications(true));
       const remaining = Number(game.top_up_amount);
       if (Number.isFinite(remaining) && remaining >= 0.01) {
-        Swal.fire({
+        await Swal.fire({
           title: "Congratulations!",
           text: "You got a special product.",
           icon: "success",
@@ -133,13 +133,14 @@ export default function Starting() {
       toast.error("Please select a rating between 1 and 5.");
       return;
     }
+    const isSpecialTask = Boolean(currentGame?.special_product);
     const profile = await refreshProfile();
     const holdValue = Number(profile?.success ? profile.data?.wallet?.on_hold : user?.wallet?.on_hold);
     const remainingHold = Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
     const stillOwed = remainingHold >= 0.01 ? remainingHold : 0;
-    if (stillOwed >= 0.01) {
+    if (isSpecialTask && stillOwed >= 0.01) {
       const topUpLabel = `$${stillOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      Swal.fire({
+      await Swal.fire({
         title: "Sorry",
         html: `<p style="line-height:1.5">Your current balance is not sufficient to clear this product. Please top up with <strong>${topUpLabel}</strong> before you can clear this product. Contact customer care for any issues.</p>`,
         icon: "warning",
@@ -151,18 +152,22 @@ export default function Starting() {
       });
       return;
     }
+    const score = rating;
+    const reviewComment = comment;
+    setOpen(false);
     setSubmitting(true);
     try {
-      const result = await dispatch(playGame(rating, comment));
+      const result = await dispatch(playGame(score, reviewComment));
       if (result?.success) {
         toast.success("Submission successful!");
         setRating(0);
         setComment("");
-        setOpen(false);
       } else {
+        setOpen(true);
         showApiError(result);
       }
     } catch (err) {
+      setOpen(true);
       showApiError(err);
     } finally {
       setSubmitting(false);
