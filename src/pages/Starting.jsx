@@ -240,7 +240,12 @@ export default function Starting() {
           <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
             <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
             <p className="text-red-600 text-xl font-bold">
-              {user?.current_number_count || 0} / {user?.total_number_can_play || 0}
+              {(() => {
+                const done = Number(user?.current_number_count || 0);
+                const total = Number(user?.total_number_can_play || 0);
+                const current = total > 0 && done < total ? done + 1 : done;
+                return `${current} / ${total}`;
+              })()}
             </p>
           </div>
         </div>
@@ -370,7 +375,7 @@ export default function Starting() {
                         <p className="text-[11px] sm:text-xs font-semibold text-gray-800 leading-tight line-clamp-2 min-h-[2rem]">{p.name}</p>
                         {(() => {
                           const isSpecial = currentGame.special_product || Number(currentGame.penalty_hold) > 0;
-                          const linePrice = isSpecial ? (p.price ?? currentGame.amount) : p.price;
+                          const linePrice = p.price;
                           if (linePrice == null) return null;
                           return (
                             <p className="text-[11px] font-bold text-red-600 mt-1">

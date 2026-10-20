@@ -126,21 +126,14 @@ export default function NegativeUsers() {
     if (!selectedRange) return toast.error("Select a hold range. Deleted ranges are no longer available.");
     const products = Number(form.number_of_negative_products);
     const rank = Number(form.rank);
-    if (!Number.isInteger(products) || products < 1) {
-      return toast.error("Number of negative products must be a whole number of at least 1.");
+    if (!Number.isInteger(products) || products < 1 || products > 5) {
+      return toast.error("Number of special products must be between 1 and 5 (one modal).");
     }
     if (!Number.isInteger(rank) || rank < 1) {
       return toast.error("Rank of appearance must be a whole number of at least 1.");
     }
     if (rank > vipRankCap) {
       return toast.error(`Rank of appearance cannot exceed ${vipRankCap} for VIP ${selectedLevel}.`);
-    }
-    if (leftToday != null && leftToday < 1) {
-      return toast.error("This user has no product appearances left today.");
-    }
-    const windowTasks = leftToday != null ? Math.min(rank, leftToday) : rank;
-    if (leftToday != null && leftToday >= rank && products > windowTasks) {
-      return toast.error(`Cannot place ${products} special products in a window of only ${windowTasks} upcoming tasks.`);
     }
     setSaving(true);
     try {
@@ -483,7 +476,7 @@ export default function NegativeUsers() {
             inputMode="numeric"
             value={form.number_of_negative_products}
             onChange={(e) => setForm({ ...form, number_of_negative_products: digitsOnly(e.target.value) })}
-            helperText="How many separate special tasks appear inside the rank window (each with its own top-up slice)."
+            helperText="How many special products appear together on one modal (max 5). Their prices sum to balance plus an on-hold amount inside the selected range."
           />
           <TextField
             label="Rank of appearance"
@@ -493,8 +486,8 @@ export default function NegativeUsers() {
             onChange={(e) => setForm({ ...form, rank: digitsOnly(e.target.value) })}
             helperText={
               selectedUser
-                ? `VIP ${selectedLevel} max is ${vipRankCap}. Next ${form.rank || "N"} tasks from ${doneToday}/${totalToday || "\u2014"}.`
-                : "Size of the upcoming task window. Max grows by 10 each VIP level (VIP 3 = 50)."
+                ? `VIP ${selectedLevel} max is ${vipRankCap}. Rank ${form.rank || "N"} is the ${form.rank || "N"}th task from now (${doneToday}/${totalToday || "\u2014"} done, ${leftToday ?? "\u2014"} left).`
+                : "How many tasks from now the special appears. Rank 2 means the 2nd upcoming task."
             }
           />
           {selectedUser && (
@@ -504,15 +497,19 @@ export default function NegativeUsers() {
               </p>
               <p className="mt-1">
                 <strong>{leftToday}</strong> appearances left today.
-                {leftToday != null && form.rank && leftToday < Number(form.rank) ? (
-                  <span> Fewer than rank {form.rank} — saving will <strong>schedule for the next daily reset</strong>.</span>
+                {leftToday != null && leftToday < 1 ? (
+                  <span> All tasks are done today — saving will <strong>schedule for the next daily reset</strong>.</span>
+                ) : null}
+                {leftToday != null && leftToday >= 1 && form.rank && Number(form.rank) > leftToday ? (
+                  <span> Rank {form.rank} is higher than the {leftToday} tasks left — saving will <strong>schedule for the next daily reset</strong>.</span>
                 ) : null}
               </p>
               <p className="mt-1 text-amber-900">
-                Window: tasks {doneToday + 1}
-                {form.rank ? `–${Math.min(doneToday + Number(form.rank), totalToday || doneToday + Number(form.rank))}` : ""}.{" "}
-                <strong>{form.number_of_negative_products || "N"}</strong> special task{Number(form.number_of_negative_products) === 1 ? "" : "s"} on random slots in that window.
-                Total amount is picked from the range and split randomly across those specials; each hit shows balance + slice and requires clearing the slice.
+                Special bundle appears on <strong>task {doneToday + (Number(form.rank) || 0)}</strong> with{" "}
+                <strong>{form.number_of_negative_products || "N"}</strong> product
+                {Number(form.number_of_negative_products) === 1 ? "" : "s"} on the same modal.
+                On-hold is a value inside the selected range. Review total = balance + that on-hold
+                (example: balance $1000 and range $600–$1000 → review total $1600–$2000).
               </p>
             </div>
           )}

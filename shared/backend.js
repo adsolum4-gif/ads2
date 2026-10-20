@@ -165,7 +165,7 @@ async function hydrateGameProducts(raw) {
       .eq("game_id", game.id);
     products = (rows || []).map((r) => r.products).filter(Boolean);
   }
-  if (game.special_product && products.length) {
+  if (game.special_product && products.length === 1) {
     const taskAmount = Number(game.amount);
     products = products.map((p) => {
       const catalog = Number(p.price);
