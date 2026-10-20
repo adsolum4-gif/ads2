@@ -2,18 +2,38 @@ import { createSlice } from "@reduxjs/toolkit";
 import { api } from "../../api/client";
 import { toast } from "sonner";
 
+function noticeKey(item) {
+  if (item?.title === "Deposit confirmed" || item?.title === "Special product") {
+    return `${item.title}|${item.message || ""}`;
+  }
+  return item?.id || `${item?.title || ""}|${item?.message || ""}|${item?.created_at || ""}`;
+}
+
+function uniqueNotices(list) {
+  const seen = new Set();
+  const out = [];
+  for (const item of list) {
+    const key = noticeKey(item);
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push(item);
+  }
+  return out;
+}
+
 const notificationsSlice = createSlice({
   name: "notifications",
   initialState: { notifications: [], isLoading: false },
   reducers: {
     setNotifications(state, action) {
-      state.notifications = Array.isArray(action.payload) ? action.payload : [];
+      const list = Array.isArray(action.payload) ? action.payload : [];
+      state.notifications = uniqueNotices(list);
       state.isLoading = false;
     },
     prependNotification(state, action) {
       const item = action.payload;
       if (!item?.id) return;
-      if (state.notifications.some((n) => n.id === item.id)) return;
+      if (state.notifications.some((n) => n.id === item.id || noticeKey(n) === noticeKey(item))) return;
       state.notifications = [item, ...state.notifications];
     },
     setLoading(state, action) {

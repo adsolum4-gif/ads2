@@ -8,6 +8,8 @@ import AnnouncementModal from "./AnnouncementModal";
 import { announcementApi, authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess } from "../store/slices/profileSlice";
 import { fetchNotifications, prependNotification } from "../store/slices/notificationsSlice";
+
+const toastedNoticeIds = new Set();
 import { setupAuthSessionSync } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
 import { logout } from "../store/slices/authSlice";
@@ -91,6 +93,8 @@ export default function AppLayout() {
         const row = payload.new;
         if (row?.user_id && user?.id && row.user_id !== user.id) return;
         dispatch(fetchNotifications(true));
+        if (!row?.id || toastedNoticeIds.has(row.id)) return;
+        toastedNoticeIds.add(row.id);
         if (row?.title === "Deposit confirmed") {
           toast.success(row.message || "Your deposit has been confirmed.");
         }

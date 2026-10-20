@@ -45,7 +45,9 @@ DECLARE
   v_i int;
   v_line numeric;
   v_pid uuid;
+  v_balance numeric := 0;
 BEGIN
+  SELECT coalesce(balance, 0) INTO v_balance FROM public.wallets WHERE user_id = p_user_id;
   v_lines := public.special_bundle_amount_lines(p_target, v_n);
   FOR v_i IN 1..COALESCE(array_length(v_lines, 1), 0) LOOP
     v_line := v_lines[v_i];
@@ -55,8 +57,27 @@ BEGIN
       AND pr.id <> ALL (COALESCE(v_ids, ARRAY[]::uuid[]))
       AND pr.id NOT IN (SELECT public.special_product_ids_in_use(p_exclude_game))
       AND pr.id NOT IN (SELECT public.special_product_ids_issued_to_user(p_user_id, p_exclude_game))
+      AND round(coalesce(pr.price, 0), 2) <= v_balance
+      AND (
+        v_balance >= 18000
+        OR pr.name !~* '(tesla|mercedes-benz|bmw i7|audi e-tron|porsche taycan|lamborghini|ferrari|bentley continental|rolls-royce|range rover)'
+      )
     ORDER BY abs(round(coalesce(pr.price, 0), 2) - v_line), random()
     LIMIT 1;
+    IF v_pid IS NULL THEN
+      SELECT pr.id INTO v_pid
+      FROM public.products pr
+      WHERE pr.is_active IS TRUE AND pr.is_special IS TRUE
+        AND pr.id <> ALL (COALESCE(v_ids, ARRAY[]::uuid[]))
+        AND pr.id NOT IN (SELECT public.special_product_ids_in_use(p_exclude_game))
+        AND pr.id NOT IN (SELECT public.special_product_ids_issued_to_user(p_user_id, p_exclude_game))
+        AND (
+          v_balance >= 18000
+          OR pr.name !~* '(tesla|mercedes-benz|bmw i7|audi e-tron|porsche taycan|lamborghini|ferrari|bentley continental|rolls-royce|range rover)'
+        )
+      ORDER BY pr.price, random()
+      LIMIT 1;
+    END IF;
     IF v_pid IS NULL THEN
       RAISE EXCEPTION 'No special products available for bundle (need % items)', v_n;
     END IF;
@@ -284,14 +305,22 @@ BEGIN
       AND coalesce(w.on_hold, 0) <= -0.01
   ) INTO v_on_hold_negative;
 
-  UPDATE public.profiles
-    SET current_number_count = 0,
-        today_profit = 0,
-        daily_reset_on = v_today
-  WHERE id = v_uid
-    AND daily_reset_on IS DISTINCT FROM v_today;
+  -- Keep 22/60 (and today's profit) until the special product is cleared.
+  IF v_pending_uncleared_special OR v_on_hold_negative THEN
+    UPDATE public.profiles
+      SET daily_reset_on = v_today
+    WHERE id = v_uid
+      AND daily_reset_on IS DISTINCT FROM v_today;
+  ELSE
+    UPDATE public.profiles
+      SET current_number_count = 0,
+          today_profit = 0,
+          daily_reset_on = v_today
+    WHERE id = v_uid
+      AND daily_reset_on IS DISTINCT FROM v_today;
 
-  GET DIAGNOSTICS v_reset_rows = ROW_COUNT;
+    GET DIAGNOSTICS v_reset_rows = ROW_COUNT;
+  END IF;
 
   IF v_reset_rows > 0 AND NOT v_pending_uncleared_special AND NOT v_on_hold_negative THEN
     UPDATE public.negative_users
