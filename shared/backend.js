@@ -556,22 +556,22 @@ async function handle(method, url, body, params = {}) {
     const { data, error } = await supabase.rpc("ensure_current_game");
     if (error) fail(error.message, { data: { message: error.message } });
     const game = await hydrateGameProducts(data);
-    if (game?.special_product) {
-      const session = await requireSession();
-      const [{ data: wallet }, { data: neg }] = await Promise.all([
-        supabase.from("wallets").select("on_hold").eq("user_id", session.user.id).maybeSingle(),
-        supabase
-          .from("negative_users")
-          .select("range_min, range_max")
-          .eq("user_id", session.user.id)
-          .eq("is_active", true)
-          .maybeSingle(),
-      ]);
-      const remaining = Number(wallet?.on_hold);
-      game.top_up_amount = Number.isFinite(remaining) && remaining < 0 ? Math.abs(remaining) : 0;
-      if (neg?.range_min != null) game.range_min = neg.range_min;
-      if (neg?.range_max != null) game.range_max = neg.range_max;
-    }
+    const session = await requireSession();
+    const [{ data: wallet }, { data: neg }] = await Promise.all([
+      supabase.from("wallets").select("on_hold").eq("user_id", session.user.id).maybeSingle(),
+      game?.special_product || Number(game?.penalty_hold) > 0
+        ? supabase
+            .from("negative_users")
+            .select("range_min, range_max")
+            .eq("user_id", session.user.id)
+            .eq("is_active", true)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+    ]);
+    const remaining = Number(wallet?.on_hold);
+    game.top_up_amount = Number.isFinite(remaining) && remaining < 0 ? Math.abs(remaining) : 0;
+    if (neg?.range_min != null) game.range_min = neg.range_min;
+    if (neg?.range_max != null) game.range_max = neg.range_max;
     return { data: game };
   }
 

@@ -137,7 +137,7 @@ export default function Starting() {
     const holdValue = Number(profile?.success ? profile.data?.wallet?.on_hold : user?.wallet?.on_hold);
     const remainingHold = Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
     const stillOwed = remainingHold >= 0.01 ? remainingHold : 0;
-    if ((currentGame?.special_product || Number(currentGame?.penalty_hold) > 0) && stillOwed >= 0.01) {
+    if (stillOwed >= 0.01) {
       const topUpLabel = `$${stillOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
       Swal.fire({
         title: "Sorry",
