@@ -9,6 +9,7 @@ import BottomNav from "../components/BottomNav";
 import ProductImage from "../components/ProductImage";
 import VipBadge from "../components/VipBadge";
 import DailyResetBanner from "../components/DailyResetBanner";
+import { formatDailyResetCountdown, msUntilNextMidnight, splitRemaining, useDailyResetCountdown } from "../utils/dailyResetTimer";
 import { OvalLoader, Spinner } from "../components/Loader";
 import { authApi, showApiError } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure } from "../store/slices/profileSlice";
@@ -28,6 +29,26 @@ function money(value) {
 
 const RATING_LABELS = ["Tap a star to rate", "Poor", "Fair", "Good", "Great", "Excellent"];
 
+function isDailySessionComplete(profile) {
+  const done = Number(profile?.current_number_count ?? 0);
+  const total = Number(profile?.total_number_can_play ?? 0);
+  return total > 0 && done >= total;
+}
+
+async function showDailySessionCompleteModal(totalTasks) {
+  const timer = formatDailyResetCountdown(splitRemaining(msUntilNextMidnight()));
+  await Swal.fire({
+    title: "Congratulations!",
+    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> tasks for today.</p><p style="line-height:1.55;margin-top:0.75rem">Come back in <strong>${timer}</strong> for new product reviews.</p>`,
+    icon: "success",
+    confirmButtonText: "OK",
+    confirmButtonColor: "#dc2626",
+    width: 340,
+    padding: "1.75em 1.1em 1.25em",
+    customClass: { popup: "special-product-swal" },
+  });
+}
+
 export default function Starting() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -41,6 +62,13 @@ export default function Starting() {
   const currentLoading = useSelector((s) => s.products.isLoading_current);
   const products = useSelector((s) => s.products.products);
   const currentGame = useSelector((s) => s.products.currentGame);
+  const { label: resetCountdownLabel } = useDailyResetCountdown();
+
+  const missionsDone = Number(user?.current_number_count || 0);
+  const missionsTotal = Number(user?.total_number_can_play || 0);
+  const sessionComplete = isDailySessionComplete(user);
+  const missionsDisplay =
+    missionsTotal > 0 && missionsDone < missionsTotal ? missionsDone + 1 : missionsDone;
 
   useEffect(() => {
     (async () => {
@@ -96,9 +124,16 @@ export default function Starting() {
         : "grid grid-cols-2 sm:grid-cols-3 gap-2.5";
 
   const startTask = async () => {
+    if (sessionComplete) return;
     const result = await dispatch(fetchCurrentGame());
     if (!result.success) {
-      toast.error(typeof result.message === "string" ? result.message : "Unable to start this task.");
+      const message = typeof result.message === "string" ? result.message : "";
+      if (/completed all tasks for today/i.test(message)) {
+        await refreshProfile();
+        await showDailySessionCompleteModal(missionsTotal || missionsDone);
+        return;
+      }
+      toast.error(message || "Unable to start this task.");
       return;
     }
     const game = result.data;
@@ -162,6 +197,12 @@ export default function Starting() {
         toast.success("Submission successful!");
         setRating(0);
         setComment("");
+        const refreshed = await refreshProfile();
+        const profile = refreshed?.success ? refreshed.data : user;
+        if (isDailySessionComplete(profile)) {
+          const total = Number(profile?.total_number_can_play ?? missionsTotal);
+          await showDailySessionCompleteModal(total);
+        }
       } else {
         setOpen(true);
         showApiError(result);
@@ -245,52 +286,97 @@ export default function Starting() {
           <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
             <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
             <p className="text-red-600 text-xl font-bold">
-              {(() => {
-                const done = Number(user?.current_number_count || 0);
-                const total = Number(user?.total_number_can_play || 0);
-                const current = total > 0 && done < total ? done + 1 : done;
-                return `${current} / ${total}`;
-              })()}
+              {missionsDisplay} / {missionsTotal}
             </p>
           </div>
         </div>
         <DailyResetBanner onReset={refreshProfile} />
-        <div className="relative flex justify-center items-center w-full mt-5">
-          <button onClick={() => setPage((p) => (p - 1 + slides.length) % Math.max(slides.length, 1))} className="absolute left-0 bg-white hover:bg-gray-50 p-3 rounded-full z-10 shadow-md border border-gray-200">
-            ❮
-          </button>
-          {isLoading && !products?.length ? (
-            <Spinner color="red" />
-          ) : slides[0]?.length > 0 ? (
+        {sessionComplete ? (
+          <div className="relative flex justify-center items-center w-full mt-5 min-h-[200px] rounded-2xl border border-emerald-200 bg-gradient-to-b from-emerald-50/90 to-white px-6 py-10 text-center">
             <div>
-              <div className="col-span-4 flex justify-around w-full">
-                {slides[page]?.slice(0, 4).map((p, i) => (
-                  <div key={p.id || i} className="flex justify-center items-center border rounded-full mx-4 md:mx-10 bg-gray-100 p-0.5 h-[70px] w-[70px] md:w-[150px] md:h-[150px] overflow-hidden">
-                    <ProductImage src={p.image} name={p.name} alt={p.name || `Product ${i + 1}`} className="w-full h-full object-cover rounded-full" />
-                  </div>
-                ))}
-              </div>
-              <div className="col-span-4 flex justify-center mt-4">
-                {slides[page]?.slice(4, 7).map((p, i) => (
-                  <div key={p.id || i} className="flex justify-center items-center border rounded-full bg-gray-100 p-0.5 mx-4 md:mx-14 w-[70px] h-[70px] md:w-[100px] md:h-[100px] lg:w-[150px] lg:h-[150px] overflow-hidden">
-                    <ProductImage src={p.image} name={p.name} alt={p.name || `Product ${i + 5}`} className="w-full h-full object-cover rounded-full" />
-                  </div>
-                ))}
-              </div>
+              <p className="text-4xl mb-3" aria-hidden>
+                ✅
+              </p>
+              <p className="text-lg font-bold text-gray-800">All tasks completed for the day</p>
+              <p className="text-sm text-gray-600 mt-2 max-w-sm mx-auto leading-relaxed">
+                Come back in <span className="font-semibold text-emerald-800">{resetCountdownLabel}</span> for new product
+                reviews.
+              </p>
             </div>
-          ) : null}
-          <button onClick={() => setPage((p) => (p + 1) % Math.max(slides.length, 1))} className="absolute right-0 bg-white hover:bg-gray-50 p-3 rounded-full z-10 shadow-md border border-gray-200">
-            ❯
-          </button>
-        </div>
+          </div>
+        ) : (
+          <div className="relative flex justify-center items-center w-full mt-5">
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p - 1 + slides.length) % Math.max(slides.length, 1))}
+              className="absolute left-0 bg-white hover:bg-gray-50 p-3 rounded-full z-10 shadow-md border border-gray-200"
+            >
+              ❮
+            </button>
+            {isLoading && !products?.length ? (
+              <Spinner color="red" />
+            ) : slides[0]?.length > 0 ? (
+              <div>
+                <div className="col-span-4 flex justify-around w-full">
+                  {slides[page]?.slice(0, 4).map((p, i) => (
+                    <div
+                      key={p.id || i}
+                      className="flex justify-center items-center border rounded-full mx-4 md:mx-10 bg-gray-100 p-0.5 h-[70px] w-[70px] md:w-[150px] md:h-[150px] overflow-hidden"
+                    >
+                      <ProductImage
+                        src={p.image}
+                        name={p.name}
+                        alt={p.name || `Product ${i + 1}`}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
+                  ))}
+                </div>
+                <div className="col-span-4 flex justify-center mt-4">
+                  {slides[page]?.slice(4, 7).map((p, i) => (
+                    <div
+                      key={p.id || i}
+                      className="flex justify-center items-center border rounded-full bg-gray-100 p-0.5 mx-4 md:mx-14 w-[70px] h-[70px] md:w-[100px] md:h-[100px] lg:w-[150px] lg:h-[150px] overflow-hidden"
+                    >
+                      <ProductImage
+                        src={p.image}
+                        name={p.name}
+                        alt={p.name || `Product ${i + 5}`}
+                        className="w-full h-full object-cover rounded-full"
+                      />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
+            <button
+              type="button"
+              onClick={() => setPage((p) => (p + 1) % Math.max(slides.length, 1))}
+              className="absolute right-0 bg-white hover:bg-gray-50 p-3 rounded-full z-10 shadow-md border border-gray-200"
+            >
+              ❯
+            </button>
+          </div>
+        )}
         <motion.button
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.98 }}
+          type="button"
+          whileHover={sessionComplete ? undefined : { scale: 1.02 }}
+          whileTap={sessionComplete ? undefined : { scale: 0.98 }}
           onClick={startTask}
-          className="mt-6 bg-red-600 hover:bg-red-700 text-white font-bold py-3.5 px-6 rounded-xl w-full text-center shadow-md"
+          disabled={sessionComplete || submitting}
+          className={`mt-6 font-bold py-3.5 px-6 rounded-xl w-full text-center shadow-md ${
+            sessionComplete
+              ? "bg-gray-200 text-gray-600 cursor-not-allowed shadow-none"
+              : "bg-red-600 hover:bg-red-700 text-white shadow-red-600/25"
+          }`}
         >
-          Starting
+          {sessionComplete ? "All tasks completed for the day" : "Starting"}
         </motion.button>
+        {sessionComplete && (
+          <p className="text-center text-xs text-gray-500 mt-2">
+            New product reviews in {resetCountdownLabel}
+          </p>
+        )}
       </div>
 
       <div className="w-full md:mb-2 mb-52 mx-auto mt-6 bg-white rounded-xl shadow-md p-6 border border-gray-200">
