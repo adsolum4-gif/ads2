@@ -40,6 +40,19 @@ function isDailySessionComplete(profile) {
   return total > 0 && done >= total;
 }
 
+function reviewSetsAllowed(profile) {
+  const n = Number(profile?.review_sets_allowed ?? profile?.wallet?.package?.number_of_set ?? 1);
+  return Number.isFinite(n) && n > 0 ? n : 1;
+}
+
+function reviewSetsCompleted(profile) {
+  return Math.max(0, Number(profile?.review_sets_completed ?? 0));
+}
+
+function allReviewSetsComplete(profile) {
+  return reviewSetsCompleted(profile) >= reviewSetsAllowed(profile) && isDailySessionComplete(profile);
+}
+
 function goToDailyReviewResetSupport(navigate, profile) {
   navigate("/home/support", {
     state: {
@@ -51,11 +64,18 @@ function goToDailyReviewResetSupport(navigate, profile) {
 
 async function showDailySessionCompleteModal(totalTasks, navigate, profile) {
   const timer = formatDailyResetCountdown(splitRemaining(msUntilNextMidnight()));
+  const setsDone = reviewSetsCompleted(profile);
+  const setsTotal = reviewSetsAllowed(profile);
+  const finishedAllSets = setsDone >= setsTotal;
+  const circleLine = finishedAllSets
+    ? `<p style="line-height:1.55;margin-top:0.75rem">You have finished all <strong>${setsDone}/${setsTotal}</strong> product review circles for this period.</p>`
+    : `<p style="line-height:1.55;margin-top:0.75rem">Review circle progress: <strong>${setsDone}/${setsTotal}</strong> complete. Support can reset today&apos;s run to <strong>0/${totalTasks}</strong> so you can start circle ${setsDone + 1}.</p>`;
+  const waitLine = finishedAllSets
+    ? `<p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow</strong> (${timer}) or contact support to increase your circle allowance.</p>`
+    : `<p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow</strong> (${timer}) or contact support for an early daily reset.</p>`;
   const result = await Swal.fire({
     title: "Congratulations!",
-    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> product reviews for today.</p>
-      <p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow:</strong> new reviews unlock in <strong>${timer}</strong> (daily reset).</p>
-      <p style="line-height:1.55;margin-top:0.75rem"><strong>Need to continue now?</strong> Contact support — they can reset your review progress to <strong>0/${totalTasks}</strong>.</p>`,
+    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> product reviews for this run.</p>${circleLine}${waitLine}`,
     icon: "success",
     showDenyButton: true,
     confirmButtonText: "Wait for reset",
@@ -87,6 +107,9 @@ export default function Starting() {
   const missionsDone = Number(user?.current_number_count || 0);
   const missionsTotal = Number(user?.total_number_can_play || 0);
   const sessionComplete = isDailySessionComplete(user);
+  const setsDone = reviewSetsCompleted(user);
+  const setsTotal = reviewSetsAllowed(user);
+  const allSetsComplete = allReviewSetsComplete(user);
   const missionsDisplay =
     missionsTotal > 0 && missionsDone < missionsTotal ? missionsDone + 1 : missionsDone;
 
@@ -148,6 +171,11 @@ export default function Starting() {
     const result = await dispatch(fetchCurrentGame());
     if (!result.success) {
       const message = typeof result.message === "string" ? result.message : "";
+      if (/completed all product review sets/i.test(message)) {
+        await refreshProfile();
+        toast.info(`You have completed all ${setsTotal} review circles (${setsDone}/${setsTotal}). Contact support if you need more.`);
+        return;
+      }
       if (/completed all tasks for today/i.test(message)) {
         const refreshed = await refreshProfile();
         const profile = refreshed?.success ? refreshed.data : user;
@@ -305,11 +333,19 @@ export default function Starting() {
             <h2 className="text-2xl font-bold text-gray-800">Start Optimization</h2>
             <p className="text-sm text-gray-500 mt-1">Review and submit tasks</p>
           </div>
-          <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
-            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
-            <p className="text-red-600 text-xl font-bold">
-              {missionsDisplay} / {missionsTotal}
-            </p>
+          <div className="flex gap-2">
+            <div className="bg-red-50 px-4 py-2 rounded-xl text-center flex-1">
+              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
+              <p className="text-red-600 text-xl font-bold">
+                {missionsDisplay} / {missionsTotal}
+              </p>
+            </div>
+            <div className="bg-amber-50 px-4 py-2 rounded-xl text-center flex-1">
+              <p className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">Circles</p>
+              <p className="text-amber-800 text-xl font-bold">
+                {setsDone} / {setsTotal}
+              </p>
+            </div>
           </div>
         </div>
         <DailyResetBanner onReset={refreshProfile} />
@@ -319,10 +355,16 @@ export default function Starting() {
               <p className="text-4xl mb-3" aria-hidden>
                 ✅
               </p>
-              <p className="text-lg font-bold text-gray-800">All tasks completed for the day</p>
+              <p className="text-lg font-bold text-gray-800">
+                {allSetsComplete ? "All review circles completed" : "All tasks completed for this run"}
+              </p>
               <p className="text-sm text-gray-600 mt-2 max-w-sm mx-auto leading-relaxed">
-                Come back in <span className="font-semibold text-emerald-800">{resetCountdownLabel}</span> for new product
-                reviews, or ask support to reset your circle early.
+                Circle progress <span className="font-semibold text-emerald-800">{setsDone}/{setsTotal}</span>.
+                {allSetsComplete
+                  ? " Contact support to allow more circles, or wait for "
+                  : " Come back in "}
+                <span className="font-semibold text-emerald-800">{resetCountdownLabel}</span>
+                {allSetsComplete ? "." : " for a new daily reset, or ask support to reset this run early."}
               </p>
               <button
                 type="button"

@@ -108,8 +108,8 @@ export default function AllUsers() {
     const pack = u.wallet?.package || u.wallet?.packs || {};
     const done = Number(u.current_number_count ?? 0);
     const total = Number(u.total_number_can_play ?? 0);
-    const setTotal = Number(pack.number_of_set ?? 0);
-    const setDone = Number(u.current_set ?? u.total_sets_completed ?? 0);
+    const setTotal = Number(u.review_sets_allowed ?? pack.number_of_set ?? 1);
+    const setDone = Number(u.review_sets_completed ?? 0);
     return {
       ...u,
       balance: Number(u.wallet?.balance ?? u.balance ?? 0).toFixed(2),
@@ -307,6 +307,7 @@ export default function AllUsers() {
                         <p><strong>Salary:</strong> {u.wallet?.salary}</p>
                         <p><strong>Level:</strong> {u.wallet?.package?.name}</p>
                         <p><strong>Missions:</strong> {u.current_number_count ?? 0} / {u.total_number_can_play ?? 0}</p>
+                        <p><strong>Submission sets:</strong> {u.review_sets_completed ?? 0} / {u.review_sets_allowed ?? u.wallet?.package?.number_of_set ?? u.wallet?.packs?.number_of_set ?? 1}</p>
                         <p><strong>Last connection:</strong> {u.last_connection ? format(new Date(u.last_connection), "dd MMM yyyy h:mm a") : "N/A"}</p>
                         <p className="flex items-center gap-2">
                           <strong>Active:</strong>
@@ -327,6 +328,21 @@ export default function AllUsers() {
       <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
         <MenuItem onClick={() => { setDialog("package"); setForm({ package_id: current?.wallet?.package?.id || current?.wallet?.package_id || "" }); setMenu(null); }}>Assign VIP level</MenuItem>
         <MenuItem onClick={() => { setDialog("missions"); setForm({ total_number_can_play: current?.total_number_can_play, current_number_count: current?.current_number_count }); setMenu(null); }}>Update missions</MenuItem>
+        <MenuItem
+          onClick={() => {
+            const pack = current?.wallet?.package || current?.wallet?.packs || {};
+            setDialog("submissionSets");
+            setForm({
+              review_sets_completed: current?.review_sets_completed ?? 0,
+              review_sets_allowed:
+                current?.review_sets_allowed ?? pack.number_of_set ?? "",
+              reason: "",
+            });
+            setMenu(null);
+          }}
+        >
+          Update submission sets
+        </MenuItem>
         <MenuItem
           onClick={() => {
             setDialog("resetReviews");
@@ -405,6 +421,51 @@ export default function AllUsers() {
         >
           Quick set: 0 / {form.total_number_can_play ?? current?.total_number_can_play ?? "N"}
         </Button>
+      </ActionDialog>
+
+      <ActionDialog
+        open={dialog === "submissionSets"}
+        title="Update submission sets"
+        onClose={() => setDialog(null)}
+        saving={saving}
+        onSave={() =>
+          postAction(endpoints.UPDATE_SUBMISSION_SETS, {
+            user_id: current.id,
+            review_sets_completed: form.review_sets_completed,
+            review_sets_allowed: form.review_sets_allowed === "" ? null : form.review_sets_allowed,
+            reason: form.reason,
+          })
+        }
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          Each time the user finishes a full daily circle (e.g. 60/60), the completed count increases by 1. Reset daily
+          reviews (0/N) starts the next circle without changing this count.
+        </p>
+        <TextField
+          label="Completed review circles"
+          type="number"
+          fullWidth
+          inputProps={{ min: 0 }}
+          value={form.review_sets_completed ?? ""}
+          onChange={(e) => setForm({ ...form, review_sets_completed: e.target.value })}
+        />
+        <TextField
+          label="Total circles allowed (leave blank to use VIP pack default)"
+          type="number"
+          fullWidth
+          inputProps={{ min: 1 }}
+          value={form.review_sets_allowed ?? ""}
+          onChange={(e) => setForm({ ...form, review_sets_allowed: e.target.value })}
+          helperText={`VIP pack default: ${current?.wallet?.package?.number_of_set ?? current?.wallet?.packs?.number_of_set ?? 1}`}
+        />
+        <TextField
+          label="Reason (optional, for admin log)"
+          fullWidth
+          multiline
+          minRows={2}
+          value={form.reason || ""}
+          onChange={(e) => setForm({ ...form, reason: e.target.value })}
+        />
       </ActionDialog>
 
       <ActionDialog
@@ -529,6 +590,7 @@ export default function AllUsers() {
               <p><strong>VIP:</strong> {info.package_name || "N/A"}</p>
               <p><strong>Balance:</strong> {info.balance}</p>
               <p><strong>Missions:</strong> {info.current_number_count ?? 0} / {info.total_number_can_play ?? 0}</p>
+              <p><strong>Submission sets:</strong> {info.review_sets_completed ?? 0} / {info.review_sets_allowed ?? "—"}</p>
             </div>
           )}
         </DialogContent>

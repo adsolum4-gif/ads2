@@ -58,7 +58,7 @@ export default function Packs() {
         <Table>
           <TableHead>
             <TableRow>
-              {["#", "Icon", "Name", "Usd value", "Daily missions", "Daily withdrawals", "Short Description", "Active", "Actions"].map((h) => <TableCell key={h}>{h}</TableCell>)}
+              {["#", "Icon", "Name", "Usd value", "Daily missions", "Review circles", "Daily withdrawals", "Short Description", "Active", "Actions"].map((h) => <TableCell key={h}>{h}</TableCell>)}
             </TableRow>
           </TableHead>
           <TableBody>
@@ -71,6 +71,7 @@ export default function Packs() {
                 <TableCell>{r.name}</TableCell>
                 <TableCell>{r.usd_value}</TableCell>
                 <TableCell>{r.daily_missions}</TableCell>
+                <TableCell>{r.number_of_set ?? 1}</TableCell>
                 <TableCell>{r.daily_withdrawals}</TableCell>
                 <TableCell>{r.short_description}</TableCell>
                 <TableCell><Switch checked={!!r.is_active || !!r.active} disabled /></TableCell>

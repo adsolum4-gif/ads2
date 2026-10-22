@@ -813,6 +813,9 @@ async function handle(method, url, body, params = {}) {
       on_hold: wallet?.on_hold,
       current_number_count: data.current_number_count,
       total_number_can_play: data.total_number_can_play,
+      review_sets_completed: data.review_sets_completed ?? 0,
+      review_sets_allowed:
+        data.review_sets_allowed ?? wallet?.packs?.number_of_set ?? 1,
     };
   }
 
@@ -925,6 +928,24 @@ async function handle(method, url, body, params = {}) {
     const { error } = await supabase.from("profiles").update(patch).eq("id", payload.user_id);
     if (error) rpcError(error);
     await logAdmin("Updated missions", payload.reason);
+    return { success: true };
+  }
+
+  if (m === "POST" && path === "/site_admin/users/update-submission-sets") {
+    await requireAdmin();
+    if (!payload.user_id) fail("User is required");
+    const patch = {};
+    if (payload.review_sets_completed != null && payload.review_sets_completed !== "") {
+      patch.review_sets_completed = Math.max(0, Number(payload.review_sets_completed));
+    }
+    if (payload.review_sets_allowed != null && payload.review_sets_allowed !== "") {
+      const n = Number(payload.review_sets_allowed);
+      patch.review_sets_allowed = Number.isFinite(n) && n > 0 ? Math.floor(n) : null;
+    }
+    if (!Object.keys(patch).length) fail("Enter completed sets and/or total sets allowed");
+    const { error } = await supabase.from("profiles").update(patch).eq("id", payload.user_id);
+    if (error) rpcError(error);
+    await logAdmin("Updated submission sets", payload.reason);
     return { success: true };
   }
 
