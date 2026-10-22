@@ -319,12 +319,7 @@ export default function NegativeUsers() {
                     {r.scheduled_for_next_reset ? (
                       <span className="text-amber-700 font-medium">Scheduled (reset)</span>
                     ) : (
-                      <>
-                        {r.rank}
-                        {r.window_start != null && r.window_end != null ? (
-                          <span className="block text-xs text-gray-500">Tasks {r.window_start}–{r.window_end}</span>
-                        ) : null}
-                      </>
+                      r.rank
                     )}
                   </TableCell>
                   <TableCell sx={{ color: Number(r.balance) < 0 ? "#d32f2f" : "inherit", fontWeight: 600 }}>
@@ -476,7 +471,7 @@ export default function NegativeUsers() {
             inputMode="numeric"
             value={form.number_of_negative_products}
             onChange={(e) => setForm({ ...form, number_of_negative_products: digitsOnly(e.target.value) })}
-            helperText="How many special products appear together on one modal (max 5). Their prices sum to balance plus an on-hold amount inside the selected range."
+            helperText="How many catalog products appear on one modal (max 5). Their list prices must add up to balance plus a value in the selected range."
           />
           <TextField
             label="Rank of appearance"
@@ -511,8 +506,8 @@ export default function NegativeUsers() {
                 Special bundle appears on <strong>{Number(form.rank) || "N"}/{totalToday || "\u2014"}</strong> with{" "}
                 <strong>{form.number_of_negative_products || "N"}</strong> product
                 {Number(form.number_of_negative_products) === 1 ? "" : "s"} on the same modal.
-                On-hold is a value inside the selected range. Review total = balance + that on-hold
-                (example: balance $1000 and range $600–$1000 → review total $1600–$2000).
+                Range applies to the combined catalog value: balance + range min through balance + range max.
+                On-hold shown to the user is only the shortfall (max(0, sum of prices − balance)).
               </p>
             </div>
           )}
