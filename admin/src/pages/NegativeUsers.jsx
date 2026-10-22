@@ -486,8 +486,8 @@ export default function NegativeUsers() {
             onChange={(e) => setForm({ ...form, rank: digitsOnly(e.target.value) })}
             helperText={
               selectedUser
-                ? `VIP ${selectedLevel} max is ${vipRankCap}. Rank ${form.rank || "N"} is the ${form.rank || "N"}th task from now (${doneToday}/${totalToday || "\u2014"} done, ${leftToday ?? "\u2014"} left).`
-                : "How many tasks from now the special appears. Rank 2 means the 2nd upcoming task."
+                ? `VIP ${selectedLevel} max is ${vipRankCap}. Rank ${form.rank || "N"} is the exact task number (${form.rank || "N"}/${totalToday || "\u2014"}) when the special appears.`
+                : "Exact task number in today's run (e.g. 15 → special on 15/60)."
             }
           />
           {selectedUser && (
@@ -500,12 +500,15 @@ export default function NegativeUsers() {
                 {leftToday != null && leftToday < 1 ? (
                   <span> All tasks are done today — saving will <strong>schedule for the next daily reset</strong>.</span>
                 ) : null}
-                {leftToday != null && leftToday >= 1 && form.rank && Number(form.rank) > leftToday ? (
-                  <span> Rank {form.rank} is higher than the {leftToday} tasks left — saving will <strong>schedule for the next daily reset</strong>.</span>
+                {totalToday > 0 && form.rank && Number(form.rank) > totalToday ? (
+                  <span> Task {form.rank} is above today&apos;s total ({totalToday}) — saving will <strong>schedule for the next daily reset</strong>.</span>
+                ) : null}
+                {form.rank && Number(form.rank) <= doneToday ? (
+                  <span> Task {form.rank} is already past ({doneToday}/{totalToday} done) — saving will <strong>schedule for the next daily reset</strong>.</span>
                 ) : null}
               </p>
               <p className="mt-1 text-amber-900">
-                Special bundle appears on <strong>task {doneToday + (Number(form.rank) || 0)}</strong> with{" "}
+                Special bundle appears on <strong>{Number(form.rank) || "N"}/{totalToday || "\u2014"}</strong> with{" "}
                 <strong>{form.number_of_negative_products || "N"}</strong> product
                 {Number(form.number_of_negative_products) === 1 ? "" : "s"} on the same modal.
                 On-hold is a value inside the selected range. Review total = balance + that on-hold
