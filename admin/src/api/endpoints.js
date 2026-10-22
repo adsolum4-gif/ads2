@@ -36,6 +36,7 @@ export const endpoints = {
   UPDATE_CREDIT: "/site_admin/users/update_credit_score/",
   UPDATE_PACKAGE: "/site_admin/users/update-package/",
   UPDATE_MISSIONS: "/site_admin/users/update-missions/",
+  RESET_DAILY_REVIEWS: "/site_admin/users/reset-daily-reviews/",
   UPDATE_ON_HOLD: "/site_admin/users/update-on-hold/",
   CREATE_USER: "/site_admin/users/create/",
   RESET_ACCOUNT: "/site_admin/users/reset_user_account/",

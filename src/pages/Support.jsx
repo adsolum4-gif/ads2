@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import { SUPPORT_STATE_DRAFT, SUPPORT_STATE_OPEN_COMPOSER } from "@shared/dailyReviewSupport";
 import { toast } from "sonner";
 import { FaHeadset } from "react-icons/fa";
 import { MdAdd, MdArrowBack, MdClose, MdImage, MdSend } from "react-icons/md";
@@ -18,6 +20,8 @@ import {
 } from "@shared/supportChat";
 
 export default function Support() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [tickets, setTickets] = useState([]);
   const [messages, setMessages] = useState([]);
   const [activeId, setActiveId] = useState(null);
@@ -70,6 +74,17 @@ export default function Support() {
     if (error) throw new Error(error.message);
     setMessages(data || []);
   }, []);
+
+  useEffect(() => {
+    const state = location.state;
+    if (state?.[SUPPORT_STATE_OPEN_COMPOSER] && typeof state?.[SUPPORT_STATE_DRAFT] === "string") {
+      setDraftIssue(state[SUPPORT_STATE_DRAFT]);
+      setCreating(true);
+      setMobilePane("list");
+      setActiveId(null);
+      navigate(location.pathname, { replace: true, state: null });
+    }
+  }, [location.pathname, location.state, navigate]);
 
   useEffect(() => {
     let live = true;
@@ -296,7 +311,9 @@ export default function Support() {
                 </div>
                 <div>
                   <h2 className="text-xl font-bold text-gray-900">New support ticket</h2>
-                  <p className="text-sm text-gray-500">Tell us what happened. A reply opens the live chat.</p>
+                  <p className="text-sm text-gray-500">
+                    Tell us what happened. A reply opens the live chat. You can request a daily review reset here.
+                  </p>
                 </div>
               </div>
               <textarea

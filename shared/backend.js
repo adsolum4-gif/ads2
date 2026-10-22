@@ -958,7 +958,33 @@ async function handle(method, url, body, params = {}) {
     return { success: true };
   }
 
+  if (m === "POST" && path === "/site_admin/users/reset-daily-reviews") {
+    await requireAdmin();
+    if (!payload.user_id) fail("User is required");
+    const { data: profile, error: profErr } = await supabase
+      .from("profiles")
+      .select("username, current_number_count, total_number_can_play")
+      .eq("id", payload.user_id)
+      .single();
+    if (profErr) rpcError(profErr);
+    const { error: updErr } = await supabase
+      .from("profiles")
+      .update({ current_number_count: 0 })
+      .eq("id", payload.user_id);
+    if (updErr) rpcError(updErr);
+    await supabase.from("games").delete().eq("user_id", payload.user_id).eq("pending", true);
+    const total = profile?.total_number_can_play ?? "N";
+    const was = profile?.current_number_count ?? 0;
+    await logAdmin(
+      "Reset daily product reviews",
+      `${profile?.username || payload.user_id}: ${was}/${total} → 0/${total}${payload.reason ? ` — ${payload.reason}` : ""}`
+    );
+    return { success: true };
+  }
+
   if (m === "POST" && path === "/site_admin/users/reset_user_account") {
+    await requireAdmin();
+    if (!payload.user_id) fail("User is required");
     await supabase.from("profiles").update({ current_number_count: 0, today_profit: 0 }).eq("id", payload.user_id);
     await supabase.from("games").delete().eq("user_id", payload.user_id).eq("pending", true);
     await logAdmin("Reset user account");

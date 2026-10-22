@@ -9,6 +9,11 @@ import BottomNav from "../components/BottomNav";
 import ProductImage from "../components/ProductImage";
 import VipBadge from "../components/VipBadge";
 import DailyResetBanner from "../components/DailyResetBanner";
+import {
+  dailyReviewResetSupportDraft,
+  SUPPORT_STATE_DRAFT,
+  SUPPORT_STATE_OPEN_COMPOSER,
+} from "@shared/dailyReviewSupport";
 import { formatDailyResetCountdown, msUntilNextMidnight, splitRemaining, useDailyResetCountdown } from "../utils/dailyResetTimer";
 import { OvalLoader, Spinner } from "../components/Loader";
 import { authApi, showApiError } from "../api/client";
@@ -35,18 +40,33 @@ function isDailySessionComplete(profile) {
   return total > 0 && done >= total;
 }
 
-async function showDailySessionCompleteModal(totalTasks) {
+function goToDailyReviewResetSupport(navigate, profile) {
+  navigate("/home/support", {
+    state: {
+      [SUPPORT_STATE_OPEN_COMPOSER]: true,
+      [SUPPORT_STATE_DRAFT]: dailyReviewResetSupportDraft(profile),
+    },
+  });
+}
+
+async function showDailySessionCompleteModal(totalTasks, navigate, profile) {
   const timer = formatDailyResetCountdown(splitRemaining(msUntilNextMidnight()));
-  await Swal.fire({
+  const result = await Swal.fire({
     title: "Congratulations!",
-    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> tasks for today.</p><p style="line-height:1.55;margin-top:0.75rem">Come back in <strong>${timer}</strong> for new product reviews.</p>`,
+    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> product reviews for today.</p>
+      <p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow:</strong> new reviews unlock in <strong>${timer}</strong> (daily reset).</p>
+      <p style="line-height:1.55;margin-top:0.75rem"><strong>Need to continue now?</strong> Contact support — they can reset your review progress to <strong>0/${totalTasks}</strong>.</p>`,
     icon: "success",
-    confirmButtonText: "OK",
+    showDenyButton: true,
+    confirmButtonText: "Wait for reset",
+    denyButtonText: "Contact support",
     confirmButtonColor: "#dc2626",
-    width: 340,
+    denyButtonColor: "#374151",
+    width: 360,
     padding: "1.75em 1.1em 1.25em",
     customClass: { popup: "special-product-swal" },
   });
+  if (result.isDenied) goToDailyReviewResetSupport(navigate, profile);
 }
 
 export default function Starting() {
@@ -129,8 +149,10 @@ export default function Starting() {
     if (!result.success) {
       const message = typeof result.message === "string" ? result.message : "";
       if (/completed all tasks for today/i.test(message)) {
-        await refreshProfile();
-        await showDailySessionCompleteModal(missionsTotal || missionsDone);
+        const refreshed = await refreshProfile();
+        const profile = refreshed?.success ? refreshed.data : user;
+        const total = Number(profile?.total_number_can_play ?? missionsTotal);
+        await showDailySessionCompleteModal(total || missionsDone, navigate, profile);
         return;
       }
       toast.error(message || "Unable to start this task.");
@@ -201,7 +223,7 @@ export default function Starting() {
         const profile = refreshed?.success ? refreshed.data : user;
         if (isDailySessionComplete(profile)) {
           const total = Number(profile?.total_number_can_play ?? missionsTotal);
-          await showDailySessionCompleteModal(total);
+          await showDailySessionCompleteModal(total, navigate, profile);
         }
       } else {
         setOpen(true);
@@ -300,8 +322,15 @@ export default function Starting() {
               <p className="text-lg font-bold text-gray-800">All tasks completed for the day</p>
               <p className="text-sm text-gray-600 mt-2 max-w-sm mx-auto leading-relaxed">
                 Come back in <span className="font-semibold text-emerald-800">{resetCountdownLabel}</span> for new product
-                reviews.
+                reviews, or ask support to reset your circle early.
               </p>
+              <button
+                type="button"
+                onClick={() => goToDailyReviewResetSupport(navigate, user)}
+                className="mt-5 inline-flex items-center justify-center rounded-xl bg-red-600 hover:bg-red-700 text-white text-sm font-semibold px-5 py-2.5 shadow-md shadow-red-600/20"
+              >
+                Contact support to reset reviews
+              </button>
             </div>
           </div>
         ) : (
@@ -373,9 +402,16 @@ export default function Starting() {
           {sessionComplete ? "All tasks completed for the day" : "Starting"}
         </motion.button>
         {sessionComplete && (
-          <p className="text-center text-xs text-gray-500 mt-2">
-            New product reviews in {resetCountdownLabel}
-          </p>
+          <div className="text-center mt-2 space-y-2">
+            <p className="text-xs text-gray-500">New product reviews in {resetCountdownLabel}</p>
+            <button
+              type="button"
+              onClick={() => goToDailyReviewResetSupport(navigate, user)}
+              className="text-xs font-semibold text-red-600 hover:text-red-700 underline underline-offset-2"
+            >
+              Contact support for an early reset
+            </button>
+          </div>
         )}
       </div>
 

@@ -327,6 +327,15 @@ export default function AllUsers() {
       <Menu anchorEl={menu} open={!!menu} onClose={() => setMenu(null)}>
         <MenuItem onClick={() => { setDialog("package"); setForm({ package_id: current?.wallet?.package?.id || current?.wallet?.package_id || "" }); setMenu(null); }}>Assign VIP level</MenuItem>
         <MenuItem onClick={() => { setDialog("missions"); setForm({ total_number_can_play: current?.total_number_can_play, current_number_count: current?.current_number_count }); setMenu(null); }}>Update missions</MenuItem>
+        <MenuItem
+          onClick={() => {
+            setDialog("resetReviews");
+            setForm({ reason: "" });
+            setMenu(null);
+          }}
+        >
+          Reset daily reviews (0/{current?.total_number_can_play ?? "N"})
+        </MenuItem>
         <MenuItem onClick={() => { setDialog("hold"); setForm({ amount: current?.wallet?.on_hold }); setMenu(null); }}>Update on hold</MenuItem>
         <MenuItem onClick={() => { setDialog("login"); setForm({}); setMenu(null); }}>Reset login password</MenuItem>
         <MenuItem onClick={() => { setDialog("withdraw"); setForm({}); setMenu(null); }}>Update withdrawal password</MenuItem>
@@ -387,6 +396,46 @@ export default function AllUsers() {
       <ActionDialog open={dialog === "missions"} title="Update missions" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_MISSIONS, { user_id: current.id, total_number_can_play: form.total_number_can_play, current_number_count: form.current_number_count })}>
         <TextField label="Completed today" type="number" fullWidth value={form.current_number_count ?? ""} onChange={(e) => setForm({ ...form, current_number_count: e.target.value })} />
         <TextField label="Daily mission limit" type="number" fullWidth value={form.total_number_can_play ?? ""} onChange={(e) => setForm({ ...form, total_number_can_play: e.target.value })} />
+        <Button
+          size="small"
+          variant="outlined"
+          color="warning"
+          className="!mt-1 !justify-start"
+          onClick={() => setForm((f) => ({ ...f, current_number_count: 0 }))}
+        >
+          Quick set: 0 / {form.total_number_can_play ?? current?.total_number_can_play ?? "N"}
+        </Button>
+      </ActionDialog>
+
+      <ActionDialog
+        open={dialog === "resetReviews"}
+        title="Reset daily product reviews"
+        onClose={() => setDialog(null)}
+        saving={saving}
+        saveLabel={saving ? "Resetting…" : "Reset to 0"}
+        onSave={() =>
+          postAction(endpoints.RESET_DAILY_REVIEWS, {
+            user_id: current.id,
+            reason: form.reason,
+          })
+        }
+      >
+        <p className="text-sm text-gray-700 leading-relaxed">
+          This sets <strong>{current?.username}</strong>&apos;s progress from{" "}
+          <strong>
+            {current?.current_number_count ?? 0}/{current?.total_number_can_play ?? "N"}
+          </strong>{" "}
+          to <strong>0/{current?.total_number_can_play ?? "N"}</strong>, clears any pending optimization task, and
+          does not change wallet balance or today&apos;s profit.
+        </p>
+        <TextField
+          label="Reason (optional, for admin log)"
+          fullWidth
+          multiline
+          minRows={2}
+          value={form.reason || ""}
+          onChange={(e) => setForm({ ...form, reason: e.target.value })}
+        />
       </ActionDialog>
 
       <ActionDialog open={dialog === "hold"} title="Update on hold" onClose={() => setDialog(null)} saving={saving} onSave={() => postAction(endpoints.UPDATE_ON_HOLD, { user_id: current.id, amount: form.amount, reason: form.reason })}>
