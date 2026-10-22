@@ -1,6 +1,6 @@
 import { toast } from "sonner";
 import { createApi } from "@shared/backend";
-import { ensureFreshSession, persistSessionTokens } from "@shared/authSession";
+import { ensureFreshSession, isSessionRelatedFailure, persistSessionTokens } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
 
 export const API_BASE = import.meta.env.VITE_SUPABASE_URL || "https://cfthacqhkkqzrbgqvckr.supabase.co";
@@ -11,6 +11,7 @@ export function unwrap(res) {
 }
 
 export function showError(error, fallback = "An unknown server error occurred. Please try again later.") {
+  if (isSessionRelatedFailure(error)) return;
   const data = error?.response?.data;
   const message = data?.errors || data?.message || data?.error || data?.detail || error?.message || fallback;
   if (typeof message === "string") toast.error(message);

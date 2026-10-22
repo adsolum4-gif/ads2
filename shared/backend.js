@@ -1,6 +1,6 @@
 import { supabase } from "./supabase";
 import { compressImage, isUploadFile } from "./compressImage";
-import { emitSessionExpired, ensureFreshSession } from "./authSession";
+import { emitSessionExpired, ensureFreshSession, isSessionRelatedFailure } from "./authSession";
 
 export const API_BASE = SUPABASE_PLACEHOLDER();
 
@@ -1393,7 +1393,7 @@ export function createApi() {
       if (!error.response) {
         error.response = { status: 500, data: { message: error.message } };
       }
-      if (error.response?.status === 401) emitSessionExpired();
+      if (isSessionRelatedFailure(error)) emitSessionExpired();
       throw error;
     }
   };

@@ -13,12 +13,10 @@ import {
   TextField,
 } from "@mui/material";
 import { format } from "date-fns";
-import { useDispatch } from "react-redux";
-import { useNavigate } from "react-router-dom";
 import { api, unwrap, showError } from "../api/client";
+import { isSessionRelatedFailure } from "@shared/authSession";
 import { endpoints } from "../api/endpoints";
 import { PageHeader, LoadingBar, FetchError } from "../components/PageHeader";
-import { clearUser } from "../store";
 import { useAdminLiveRefresh } from "../live";
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
@@ -29,8 +27,6 @@ function monthValues(obj) {
 }
 
 export default function Dashboard() {
-  const dispatch = useDispatch();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [data, setData] = useState(null);
@@ -48,9 +44,7 @@ export default function Dashboard() {
       const dashboard = payload?.dashboard || payload || {};
       setData(typeof dashboard === "string" ? JSON.parse(dashboard) : dashboard);
     } catch (err) {
-      if (err?.response?.status === 401) {
-        dispatch(clearUser());
-        navigate("/admin", { replace: true });
+      if (isSessionRelatedFailure(err)) {
         return;
       }
       if (!silent) {

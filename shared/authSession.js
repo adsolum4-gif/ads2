@@ -58,6 +58,27 @@ export function emitSessionExpired() {
   }
 }
 
+/** True when the client should sign out and return to login (expired or invalid auth). */
+export function isSessionRelatedFailure(error) {
+  const status = Number(error?.response?.status);
+  const msg = String(error?.response?.data?.message || error?.message || "").toLowerCase();
+  if (status === 401) return true;
+  if (
+    msg.includes("session expired") ||
+    msg.includes("please log in") ||
+    msg.includes("not authenticated") ||
+    msg.includes("jwt expired") ||
+    msg.includes("invalid claim") ||
+    msg.includes("refresh token")
+  ) {
+    return true;
+  }
+  const onAdminApp =
+    typeof localStorage !== "undefined" && Boolean(localStorage.getItem("adminUser"));
+  if (onAdminApp && status === 403 && msg.includes("not authorized")) return true;
+  return false;
+}
+
 function isSessionExpired(session, skewSec = 30) {
   if (!session?.expires_at) return false;
   return session.expires_at * 1000 <= Date.now() + skewSec * 1000;
@@ -91,6 +112,10 @@ export async function ensureFreshSession() {
     } else {
       session = refreshed.data.session;
     }
+  }
+
+  if (session && isSessionExpired(session)) {
+    session = null;
   }
 
   if (session) {

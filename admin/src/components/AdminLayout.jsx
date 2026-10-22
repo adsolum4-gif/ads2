@@ -11,7 +11,7 @@ import { clearUser, toggleSidebar } from "../store";
 import { api, unwrap, showError } from "../api/client";
 import { endpoints } from "../api/endpoints";
 import { toast } from "sonner";
-import { setupAuthSessionSync } from "@shared/authSession";
+import { isSessionRelatedFailure, setupAuthSessionSync } from "@shared/authSession";
 import { supabase } from "@shared/supabase";
 
 export default function AdminLayout() {
@@ -51,8 +51,9 @@ function AdminShell() {
         const { data } = await api.get(endpoints.GET_ADMIN);
         const payload = unwrap({ data });
         setAdmin(payload);
-      } catch {
-        /* keep stored user */
+      } catch (err) {
+        if (isSessionRelatedFailure(err)) return;
+        /* keep stored user for transient errors */
       }
     })();
     loadNotifs();
