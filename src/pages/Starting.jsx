@@ -17,6 +17,11 @@ import {
 import { formatDailyResetCountdown, msUntilNextMidnight, splitRemaining, useDailyResetCountdown } from "../utils/dailyResetTimer";
 import { OvalLoader, Spinner } from "../components/Loader";
 import { authApi, showApiError } from "../api/client";
+import {
+  isSpecialClearBlockedMessage,
+  showSpecialTopUpRequiredModal,
+  specialTopUpOwed,
+} from "../utils/specialProductTopUp";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure } from "../store/slices/profileSlice";
 import { fetchProducts, fetchCurrentGame, playGame } from "../store/slices/productsSlice";
 import { fetchNotifications } from "../store/slices/notificationsSlice";
@@ -64,18 +69,14 @@ function goToDailyReviewResetSupport(navigate, profile) {
 
 async function showDailySessionCompleteModal(totalTasks, navigate, profile) {
   const timer = formatDailyResetCountdown(splitRemaining(msUntilNextMidnight()));
-  const setsDone = reviewSetsCompleted(profile);
-  const setsTotal = reviewSetsAllowed(profile);
-  const finishedAllSets = setsDone >= setsTotal;
-  const circleLine = finishedAllSets
-    ? `<p style="line-height:1.55;margin-top:0.75rem">You have finished all <strong>${setsDone}/${setsTotal}</strong> product review circles for this period.</p>`
-    : `<p style="line-height:1.55;margin-top:0.75rem">Review circle progress: <strong>${setsDone}/${setsTotal}</strong> complete. Support can reset today&apos;s run to <strong>0/${totalTasks}</strong> so you can start circle ${setsDone + 1}.</p>`;
-  const waitLine = finishedAllSets
-    ? `<p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow</strong> (${timer}) or contact support to increase your circle allowance.</p>`
+  const noMoreRuns =
+    reviewSetsCompleted(profile) >= reviewSetsAllowed(profile);
+  const waitLine = noMoreRuns
+    ? `<p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow</strong> (${timer}) or contact support if you need further assistance.</p>`
     : `<p style="line-height:1.55;margin-top:0.75rem"><strong>Wait for tomorrow</strong> (${timer}) or contact support for an early daily reset.</p>`;
   const result = await Swal.fire({
     title: "Congratulations!",
-    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> product reviews for this run.</p>${circleLine}${waitLine}`,
+    html: `<p style="line-height:1.55">You have completed all <strong>${totalTasks}</strong> product reviews for this run.</p>${waitLine}`,
     icon: "success",
     showDenyButton: true,
     confirmButtonText: "Wait for reset",
@@ -107,8 +108,6 @@ export default function Starting() {
   const missionsDone = Number(user?.current_number_count || 0);
   const missionsTotal = Number(user?.total_number_can_play || 0);
   const sessionComplete = isDailySessionComplete(user);
-  const setsDone = reviewSetsCompleted(user);
-  const setsTotal = reviewSetsAllowed(user);
   const allSetsComplete = allReviewSetsComplete(user);
   const missionsDisplay =
     missionsTotal > 0 && missionsDone < missionsTotal ? missionsDone + 1 : missionsDone;
@@ -173,7 +172,7 @@ export default function Starting() {
       const message = typeof result.message === "string" ? result.message : "";
       if (/completed all product review sets/i.test(message)) {
         await refreshProfile();
-        toast.info(`You have completed all ${setsTotal} review circles (${setsDone}/${setsTotal}). Contact support if you need more.`);
+        toast.info("You have completed all available product reviews. Contact support if you need assistance.");
         return;
       }
       if (/completed all tasks for today/i.test(message)) {
@@ -220,21 +219,10 @@ export default function Starting() {
     }
     const isSpecialTask = Boolean(currentGame?.special_product);
     const profile = await refreshProfile();
-    const holdValue = Number(profile?.success ? profile.data?.wallet?.on_hold : user?.wallet?.on_hold);
-    const remainingHold = Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
-    const stillOwed = remainingHold >= 0.01 ? remainingHold : 0;
+    const onHold = profile?.success ? profile.data?.wallet?.on_hold : user?.wallet?.on_hold;
+    const stillOwed = specialTopUpOwed(onHold, currentGame?.penalty_hold);
     if (isSpecialTask && stillOwed >= 0.01) {
-      const topUpLabel = `$${stillOwed.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-      await Swal.fire({
-        title: "Sorry",
-        html: `<p style="line-height:1.5">Your current balance is not sufficient to clear this product. Please top up with <strong>${topUpLabel}</strong> before you can clear this product. Contact customer care for any issues.</p>`,
-        icon: "warning",
-        confirmButtonText: "OK",
-        confirmButtonColor: "#dc2626",
-        width: 320,
-        padding: "1.75em 1.1em 1.25em",
-        customClass: { popup: "special-product-swal" },
-      });
+      await showSpecialTopUpRequiredModal(stillOwed);
       return;
     }
     const score = rating;
@@ -255,11 +243,25 @@ export default function Starting() {
         }
       } else {
         setOpen(true);
-        showApiError(result);
+        const msg = typeof result?.message === "string" ? result.message : "";
+        const owed = specialTopUpOwed(user?.wallet?.on_hold, currentGame?.penalty_hold);
+        if (isSpecialTask && (owed >= 0.01 || isSpecialClearBlockedMessage(msg))) {
+          if (owed >= 0.01) await showSpecialTopUpRequiredModal(owed);
+          else showApiError(msg || result);
+        } else {
+          showApiError(msg || result);
+        }
       }
     } catch (err) {
       setOpen(true);
-      showApiError(err);
+      const msg = err?.response?.data?.message || err?.message || "";
+      const owed = specialTopUpOwed(user?.wallet?.on_hold, currentGame?.penalty_hold);
+      if (isSpecialTask && (owed >= 0.01 || isSpecialClearBlockedMessage(msg))) {
+        if (owed >= 0.01) await showSpecialTopUpRequiredModal(owed);
+        else showApiError(err);
+      } else {
+        showApiError(err);
+      }
     } finally {
       setSubmitting(false);
     }
@@ -333,19 +335,11 @@ export default function Starting() {
             <h2 className="text-2xl font-bold text-gray-800">Start Optimization</h2>
             <p className="text-sm text-gray-500 mt-1">Review and submit tasks</p>
           </div>
-          <div className="flex gap-2">
-            <div className="bg-red-50 px-4 py-2 rounded-xl text-center flex-1">
-              <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
-              <p className="text-red-600 text-xl font-bold">
-                {missionsDisplay} / {missionsTotal}
-              </p>
-            </div>
-            <div className="bg-amber-50 px-4 py-2 rounded-xl text-center flex-1">
-              <p className="text-[10px] uppercase tracking-wide text-amber-600 font-semibold">Circles</p>
-              <p className="text-amber-800 text-xl font-bold">
-                {setsDone} / {setsTotal}
-              </p>
-            </div>
+          <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
+            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
+            <p className="text-red-600 text-xl font-bold">
+              {missionsDisplay} / {missionsTotal}
+            </p>
           </div>
         </div>
         <DailyResetBanner onReset={refreshProfile} />
@@ -356,13 +350,12 @@ export default function Starting() {
                 ✅
               </p>
               <p className="text-lg font-bold text-gray-800">
-                {allSetsComplete ? "All review circles completed" : "All tasks completed for this run"}
+                {allSetsComplete ? "All product reviews completed" : "All tasks completed for this run"}
               </p>
               <p className="text-sm text-gray-600 mt-2 max-w-sm mx-auto leading-relaxed">
-                Circle progress <span className="font-semibold text-emerald-800">{setsDone}/{setsTotal}</span>.
                 {allSetsComplete
-                  ? " Contact support to allow more circles, or wait for "
-                  : " Come back in "}
+                  ? "Contact support if you need further assistance, or wait for "
+                  : "Come back in "}
                 <span className="font-semibold text-emerald-800">{resetCountdownLabel}</span>
                 {allSetsComplete ? "." : " for a new daily reset, or ask support to reset this run early."}
               </p>

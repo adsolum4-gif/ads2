@@ -81,7 +81,13 @@ export const playGame = (ratingScore, comment) => async (dispatch) => {
     return { success: true, data: data.data || null };
   } catch (error) {
     dispatch(setLoading(false));
-    return { success: false, message: error.response?.data?.message || "Failed to submit the game." };
+    const msg =
+      error.response?.data?.message ||
+      error.response?.data?.detail ||
+      (typeof error.response?.data === "string" ? error.response.data : null) ||
+      error.message ||
+      "Failed to submit the game.";
+    return { success: false, message: msg };
   }
 };
 

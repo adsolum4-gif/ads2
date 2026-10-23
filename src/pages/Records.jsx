@@ -7,7 +7,13 @@ import BackButton from "../components/BackButton";
 import Loader from "../components/Loader";
 import ProductImage from "../components/ProductImage";
 import { fetchGameRecords, playGame } from "../store/slices/productsSlice";
-import { showApiError } from "../api/client";
+import { authApi, showApiError } from "../api/client";
+import {
+  isSpecialClearBlockedMessage,
+  isSpecialRecord,
+  showSpecialTopUpRequiredModal,
+  specialTopUpOwed,
+} from "../utils/specialProductTopUp";
 import { fadeIn } from "../utils/motion";
 
 const STATUS = {
@@ -33,14 +39,44 @@ export default function Records() {
     dispatch(fetchGameRecords());
   }, [dispatch]);
 
-  const submitPending = async () => {
+  const submitPending = async (record) => {
     try {
+      const profileRes = await authApi.fetchProfile();
+      const wallet = profileRes?.success ? profileRes.data?.wallet : null;
+      const onHold = wallet?.on_hold;
+      if (isSpecialRecord(record)) {
+        const owed = specialTopUpOwed(onHold, record.penalty_hold);
+        if (owed >= 0.01) {
+          await showSpecialTopUpRequiredModal(owed);
+          return;
+        }
+      }
       const result = await dispatch(playGame(4, ""));
       if (result.success) {
         toast.success("Submission successful!");
         dispatch(fetchGameRecords());
-      } else showApiError(result.message);
+        return;
+      }
+      const msg = typeof result.message === "string" ? result.message : "";
+      if (isSpecialRecord(record) || isSpecialClearBlockedMessage(msg)) {
+        const owed = specialTopUpOwed(onHold, record?.penalty_hold);
+        if (owed >= 0.01) {
+          await showSpecialTopUpRequiredModal(owed);
+          return;
+        }
+      }
+      showApiError(msg || result);
     } catch (err) {
+      const msg = err?.response?.data?.message || err?.message || "";
+      if (isSpecialRecord(record) || isSpecialClearBlockedMessage(msg)) {
+        const profileRes = await authApi.fetchProfile();
+        const onHold = profileRes?.success ? profileRes.data?.wallet?.on_hold : undefined;
+        const owed = specialTopUpOwed(onHold, record?.penalty_hold);
+        if (owed >= 0.01) {
+          await showSpecialTopUpRequiredModal(owed);
+          return;
+        }
+      }
       showApiError(err);
     }
   };
@@ -73,7 +109,7 @@ export default function Records() {
                 <div className="absolute top-2 right-2 md:top-4 md:right-4 flex items-center space-x-2">
                   <div className={`px-2 py-1 rounded-full text-xs font-semibold ${STATUS[status]}`}>{status}</div>
                   {status === "Pending" && (
-                    <button onClick={submitPending} className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-600 rounded-full">
+                    <button onClick={() => submitPending(item)} className="px-2 py-1 text-xs font-semibold bg-green-100 text-green-600 rounded-full">
                       Submit
                     </button>
                   )}

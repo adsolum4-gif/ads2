@@ -8,6 +8,14 @@ export const api = createApi();
 export const refreshClient = api;
 
 export function showApiError(error, fallback = "An unexpected error occurred.") {
+  if (typeof error === "string") {
+    toast.error(error);
+    return;
+  }
+  if (error && typeof error === "object" && typeof error.message === "string" && !error.response) {
+    toast.error(error.message);
+    return;
+  }
   const data = error?.response?.data;
   const message = data?.errors || data?.message || data?.detail || error?.message || fallback;
   if (typeof message === "string") toast.error(message);
