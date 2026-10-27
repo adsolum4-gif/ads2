@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useDispatch, useSelector } from "react-redux";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
@@ -23,7 +23,8 @@ import { fetchPacks } from "../store/slices/packsSlice";
 import { authApi } from "../api/client";
 import { fetchProfileStart, fetchProfileSuccess, fetchProfileFailure, toggleWelcomeState, setWelcomeState } from "../store/slices/profileSlice";
 import { fetchNotifications } from "../store/slices/notificationsSlice";
-import VipBadge, { amountToReachVip, vipDepositState, vipFromBalance, vipLevel, vipMeta, withVipLevels } from "../components/VipBadge";
+import VipBadge, { amountToReachVip, vipFromBalance, vipLevel, vipMeta, withVipLevels } from "../components/VipBadge";
+import VipLevelDetailSheet from "../components/VipLevelDetailSheet";
 
 const quickLinks = [
   { label: "Starting", icon: MdPlayCircle, route: "/home/starting" },
@@ -48,6 +49,24 @@ export default function Home() {
   const packList = withVipLevels(rawPacks);
   const balance = Number(user?.wallet?.balance || 0);
   const currentVip = vipFromBalance(packList, balance);
+  const [vipDetailPack, setVipDetailPack] = useState(null);
+  const missionsDone = Number(user?.current_number_count ?? 0);
+  const missionsTotal = Number(user?.total_number_can_play ?? 0);
+  const setsDone = Number(user?.review_sets_completed ?? 0);
+  const setsTotal = Math.max(
+    1,
+    Number(user?.review_sets_allowed ?? user?.wallet?.package?.number_of_set ?? 1)
+  );
+
+  const openVipDeposit = (deposit) => {
+    setVipDetailPack(null);
+    const amt = Number(deposit?.amount);
+    if (Number.isFinite(amt) && amt > 0) {
+      navigate(`/home/deposit?amount=${amt.toFixed(2)}`);
+    } else {
+      navigate("/home/deposit");
+    }
+  };
 
   useEffect(() => {
     if (!rawPacks.length) dispatch(fetchPacks());
@@ -157,11 +176,32 @@ export default function Home() {
       )}
 
       <div className="container mx-auto mt-10 px-4 md:mb-6 mb-52">
+        {user && (
+          <div className="bg-white rounded-xl border border-gray-100 shadow-md p-4 sm:p-5 mb-8 inline-block w-full sm:w-auto sm:min-w-[12rem]">
+            <div className="flex flex-wrap items-baseline gap-x-6 gap-y-2 sm:gap-x-10">
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
+                <p className="text-2xl font-bold text-red-600 leading-tight">
+                  {missionsDone}
+                  <span className="text-gray-400 font-semibold text-lg"> / {missionsTotal || "—"}</span>
+                </p>
+              </div>
+              <div>
+                <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Sets completed</p>
+                <p className="text-2xl font-bold text-red-600 leading-tight">
+                  {setsDone}
+                  <span className="text-gray-400 font-semibold text-lg"> / {setsTotal}</span>
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         <div className="flex justify-between items-center mb-6">
           <div>
             <h2 className="text-2xl font-bold text-gray-800">VIP Levels</h2>
             <p className="text-sm text-gray-500 mt-1">
-              Your level is {currentVip?.name || "VIP 1"} from your ${balance.toFixed(2)} balance. Tap a crown to deposit the remaining amount.
+              Your level is {currentVip?.name || "VIP 1"} from your ${balance.toFixed(2)} balance. Tap a level to view benefits.
             </p>
           </div>
           <motion.button
@@ -191,7 +231,7 @@ export default function Home() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.05, duration: 0.35 }}
                   whileHover={{ scale: 1.04, y: -4 }}
-                  onClick={() => navigate("/home/deposit", { state: { upgrade: vipDepositState(pack, balance) } })}
+                  onClick={() => setVipDetailPack(pack)}
                   className={`bg-white p-4 sm:p-5 rounded-xl cursor-pointer shadow-md hover:shadow-xl flex flex-col justify-center items-center transition-all duration-300 border ${isCurrent ? "border-red-500 ring-2 ring-red-200" : meta.border}`}
                 >
                   <div className="flex justify-between w-full items-center mb-3">
@@ -200,11 +240,11 @@ export default function Home() {
                   </div>
                   <h3 className="font-bold text-gray-800 md:text-lg text-base text-center">{pack.name}</h3>
                   <p className={`text-[11px] font-semibold uppercase tracking-wide mt-0.5 mb-2 ${meta.text}`}>{meta.title}</p>
-                  <p className="text-gray-600 text-xs md:text-sm text-center leading-relaxed">
-                    {pack.short_description || "No description available."}
+                  <p className="text-gray-600 text-xs md:text-sm text-center leading-relaxed line-clamp-2">
+                    {pack.short_description || "Tap to see membership benefits"}
                   </p>
                   <p className={`mt-2 text-[11px] font-semibold ${isCurrent ? "text-red-600" : remaining > 0 ? "text-gray-500" : "text-emerald-600"}`}>
-                    {isCurrent ? "Current level" : remaining > 0 ? `Deposit $${remaining.toFixed(2)} to unlock` : "Unlocked"}
+                    {isCurrent ? "Current level · View benefits" : remaining > 0 ? "Tap for details" : "Unlocked · View benefits"}
                   </p>
                 </motion.div>
               );
@@ -214,6 +254,14 @@ export default function Home() {
           )}
         </div>
       </div>
+      <VipLevelDetailSheet
+        open={!!vipDetailPack}
+        pack={vipDetailPack}
+        balance={balance}
+        currentLevel={vipLevel(currentVip)}
+        onClose={() => setVipDetailPack(null)}
+        onDeposit={openVipDeposit}
+      />
       <BottomNav />
     </div>
   );

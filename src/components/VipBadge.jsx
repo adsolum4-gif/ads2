@@ -77,6 +77,25 @@ export function amountToReachVip(pack, balance) {
   return Math.max(0, Math.round(need * 100) / 100);
 }
 
+/** Extra perk lines from pack description (excludes redundant title/metal labels). */
+export function vipDescriptionLines(pack) {
+  const meta = vipMeta(pack);
+  return (pack?.description || "")
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter((line) => {
+      if (!line) return false;
+      const name = line.replace(/\.$/, "").toLowerCase();
+      const metal = meta.metal.toLowerCase();
+      return (
+        name !== meta.title.toLowerCase()
+        && name !== `${metal} member`
+        && name !== `${metal} rank`
+        && name !== metal
+      );
+    });
+}
+
 export function vipUnlockFeatures(pack) {
   const meta = vipMeta(pack);
   const level = meta.level;

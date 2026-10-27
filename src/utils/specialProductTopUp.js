@@ -4,13 +4,10 @@ export function isSpecialRecord(record) {
   return Boolean(record?.special_product) || Number(record?.penalty_hold) > 0;
 }
 
-/** Amount user still needs to deposit to clear wallet on-hold (or penalty hold fallback). */
-export function specialTopUpOwed(walletOnHold, penaltyHold = 0) {
+/** Amount user still needs to deposit to clear wallet on-hold. */
+export function specialTopUpOwed(walletOnHold, _penaltyHold = 0) {
   const holdValue = Number(walletOnHold);
-  const remainingHold = Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
-  if (remainingHold >= 0.01) return remainingHold;
-  const ph = Number(penaltyHold);
-  return Number.isFinite(ph) && ph >= 0.01 ? ph : 0;
+  return Number.isFinite(holdValue) ? Math.abs(Math.min(holdValue, 0)) : 0;
 }
 
 export function isSpecialClearBlockedMessage(message) {

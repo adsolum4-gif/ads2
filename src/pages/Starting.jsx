@@ -109,8 +109,10 @@ export default function Starting() {
   const missionsTotal = Number(user?.total_number_can_play || 0);
   const sessionComplete = isDailySessionComplete(user);
   const allSetsComplete = allReviewSetsComplete(user);
-  const missionsDisplay =
-    missionsTotal > 0 && missionsDone < missionsTotal ? missionsDone + 1 : missionsDone;
+
+  const specialStillOwesTopUp = (game) =>
+    Boolean(game?.special_product)
+    && specialTopUpOwed(user?.wallet?.on_hold, game?.penalty_hold) >= 0.01;
 
   useEffect(() => {
     (async () => {
@@ -190,7 +192,10 @@ export default function Starting() {
       toast.error("No task is available right now.");
       return;
     }
-    if (game.special_product || Number(game.penalty_hold) > 0) {
+    const specialNeedsTopUp =
+      Boolean(game.special_product)
+      && specialTopUpOwed(user?.wallet?.on_hold, game?.penalty_hold) >= 0.01;
+    if (specialNeedsTopUp) {
       await refreshProfile();
       dispatch(fetchNotifications(true));
       const remaining = Number(game.top_up_amount);
@@ -335,10 +340,16 @@ export default function Starting() {
             <h2 className="text-2xl font-bold text-gray-800">Start Optimization</h2>
             <p className="text-sm text-gray-500 mt-1">Review and submit tasks</p>
           </div>
-          <div className="bg-red-50 px-4 py-2 rounded-xl text-center">
+          <div className="bg-red-50 px-4 py-2.5 rounded-xl text-center shrink-0">
             <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold">Today</p>
-            <p className="text-red-600 text-xl font-bold">
-              {missionsDisplay} / {missionsTotal}
+            <p className="text-red-600 text-xl font-bold leading-tight">
+              {missionsDone}
+              <span className="text-gray-500 font-semibold text-base"> / {missionsTotal}</span>
+            </p>
+            <p className="text-[10px] uppercase tracking-wide text-red-400 font-semibold mt-2">Sets completed</p>
+            <p className="text-red-600 text-lg font-bold leading-tight">
+              {reviewSetsCompleted(user)}
+              <span className="text-gray-500 font-semibold text-sm"> / {reviewSetsAllowed(user)}</span>
             </p>
           </div>
         </div>
@@ -510,15 +521,17 @@ export default function Starting() {
                 <p className="text-[11px] tracking-[0.22em] uppercase text-white/65 font-medium">Product review</p>
                 <h2 className="text-2xl font-semibold mt-1 tracking-tight">Submit your review</h2>
                 <p className="text-sm text-white/75 mt-1.5 pr-8">
-                  {currentGame.special_product || Number(currentGame.penalty_hold) > 0
-                    ? "Special product review"
-                    : "Rate the product assigned to this task."}
+                  {specialStillOwesTopUp(currentGame)
+                    ? "Special product review — top up required"
+                    : currentGame.special_product
+                      ? "Complete your assigned product review"
+                      : "Rate the product assigned to this task."}
                 </p>
                 <div className="flex flex-wrap gap-2 mt-4">
                   <span className="text-[11px] font-semibold uppercase tracking-wider bg-white/12 border border-white/15 rounded-full px-3 py-1">
                     Randomized set
                   </span>
-                  {(currentGame.special_product || Number(currentGame.penalty_hold) > 0) && (
+                  {specialStillOwesTopUp(currentGame) && (
                     <span className="text-[11px] font-semibold uppercase tracking-wider bg-amber-300/20 border border-amber-200/40 text-amber-100 rounded-full px-3 py-1">
                       Special product
                     </span>
@@ -536,7 +549,7 @@ export default function Starting() {
                       <div className="px-2 py-2 text-center">
                         <p className="text-[11px] sm:text-xs font-semibold text-gray-800 leading-tight line-clamp-2 min-h-[2rem]">{p.name}</p>
                         {(() => {
-                          const isSpecial = currentGame.special_product || Number(currentGame.penalty_hold) > 0;
+                          const isSpecial = specialStillOwesTopUp(currentGame);
                           const linePrice = p.price;
                           if (linePrice == null) return null;
                           return (
