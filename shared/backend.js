@@ -241,17 +241,23 @@ async function handle(method, url, body, params = {}) {
     try {
       const { data, error } = await supabase.functions.invoke("send-otp", { body: { email } });
       if (error) {
+        const msg = String(error.message || "");
         return {
           success: false,
           emailed: false,
-          message: error.message || "Failed to send verification code. Please try again.",
+          message: /email already registered/i.test(msg)
+            ? "Email already registered."
+            : msg || "Failed to send verification code. Please try again.",
         };
       }
       if (data?.success === false) {
+        const msg = String(data.message || "");
         return {
           success: false,
           emailed: false,
-          message: data.message || "Failed to send verification code.",
+          message: /email already registered/i.test(msg)
+            ? "Email already registered."
+            : msg || "Failed to send verification code.",
         };
       }
       return {
@@ -286,7 +292,13 @@ async function handle(method, url, body, params = {}) {
       email: payload.email,
       password: payload.password,
     });
-    if (signError) rpcError(signError);
+    if (signError) {
+      const signMsg = String(signError.message || "");
+      if (/already registered|already been registered|user already exists/i.test(signMsg)) {
+        fail("Email already registered.");
+      }
+      rpcError(signError);
+    }
     if (!signed.session) {
       const { error: inErr } = await supabase.auth.signInWithPassword({ email: payload.email, password: payload.password });
       if (inErr) rpcError(inErr);
