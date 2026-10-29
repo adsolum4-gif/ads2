@@ -12,6 +12,7 @@ const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = path.join(root, "dist");
 const port = Number(process.env.PORT || 3000);
 const hadDistBeforeStart = fs.existsSync(dist);
+const forceServe = process.argv.includes("--force-serve");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -91,10 +92,10 @@ if (!fs.existsSync(dist)) {
   process.exit(1);
 }
 
-// Render build command `npm install; npm start` runs npm start during the build step.
-// Build first, then exit so the deploy does not hang on a live HTTP server.
-if (!hadDistBeforeStart) {
-  console.log("dist/ ready — exiting (Render will run Start command next with npm start).");
+// Render build command `npm install; npm start` must not keep a server running.
+// --force-serve is used when Start command is `npm run dev` on Render.
+if (!hadDistBeforeStart && !forceServe) {
+  console.log("dist/ ready — exiting so the Render build step can finish.");
   process.exit(0);
 }
 
