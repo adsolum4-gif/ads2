@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = path.join(root, "dist");
 const port = Number(process.env.PORT || 3000);
-const shouldServe = process.argv.includes("--serve");
+const hadDistBeforeStart = fs.existsSync(dist);
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -87,18 +87,14 @@ if (!fs.existsSync(dist)) {
 }
 
 if (!fs.existsSync(dist)) {
-  console.error(
-    "Build failed — dist/ still missing.\n" +
-      "Render Web Service settings (two separate fields):\n" +
-      "  Build command:  npm run render:build\n" +
-      "  Start command:  npm start\n" +
-      "Do NOT put npm start in the Build command."
-  );
+  console.error("Build failed — dist/ still missing.");
   process.exit(1);
 }
 
-if (!shouldServe) {
-  console.log("dist/ ready. Use: npm start (or node scripts/serve-dist.mjs --serve)");
+// Render build command `npm install; npm start` runs npm start during the build step.
+// Build first, then exit so the deploy does not hang on a live HTTP server.
+if (!hadDistBeforeStart) {
+  console.log("dist/ ready — exiting (Render will run Start command next with npm start).");
   process.exit(0);
 }
 
