@@ -5,6 +5,7 @@
 import http from "node:http";
 import fs from "node:fs";
 import path from "node:path";
+import { execSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const root = fileURLToPath(new URL("..", import.meta.url));
@@ -80,10 +81,17 @@ const server = http.createServer((req, res) => {
 });
 
 if (!fs.existsSync(dist)) {
+  console.log("dist/ missing — running npm run build (this runs on Start, not during Render Build)...");
+  execSync("npm run build", { cwd: root, stdio: "inherit", env: process.env });
+}
+
+if (!fs.existsSync(dist)) {
   console.error(
-    "Missing dist/. On Render set Build command to: npm run render:build\n" +
-      "Or set Start command to: npm run render:start\n" +
-      "Locally run: npm run build"
+    "Build failed — dist/ still missing.\n" +
+      "Render Web Service settings (two separate fields):\n" +
+      "  Build command:  npm run render:build\n" +
+      "  Start command:  npm start\n" +
+      "Do NOT put npm start in the Build command."
   );
   process.exit(1);
 }
