@@ -15,6 +15,5 @@ export default defineConfig({
     port: 5173,
     host: "0.0.0.0",
     strictPort: false,
-    allowedHosts: ["ads2-az1w.onrender.com"],
   },
 });

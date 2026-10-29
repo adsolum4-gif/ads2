@@ -9,7 +9,10 @@ User and admin apps for Adsterra: task reviews, VIP levels, wallets, deposits, a
 
 Production (`npm run build`) puts the user app at `/` and the admin app at `/admin`.
 
-**Render:** Use build command `npm install && npm --prefix admin install && npm run build`, publish directory `dist`, and SPA rewrites (see `render.yaml` or `public/_redirects`). If `/admin` sends you to `/login`, the host is serving the user app for admin URLs — fix rewrites, not auth.
+**Render:** Never set start command to `npm run dev` — the live site will serve Vite dev HTML (`/@vite/client`) and `/admin` will fall through to the user app → `/login`.
+
+- **Static Site:** Build `npm install && npm --prefix admin install && npm run build`, publish **`dist`**, add [rewrites](https://render.com/docs/redirects-rewrites): `/admin` and `/admin/*` → `/admin/index.html`, then `/*` → `/index.html` (admin rules first).
+- **Web Service:** Same build, start **`node scripts/serve-dist.mjs`** (or `npm start` after build).
 
 ## Setup
 

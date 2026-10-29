@@ -1,7 +1,7 @@
-# Static site: user app at /, admin app at /admin (see scripts/build-all.mjs)
+# Static site (recommended). Do NOT use `npm run dev` as start command on Render.
 services:
   - type: web
-    name: adsterra
+    name: ads2
     runtime: static
     buildCommand: npm install && npm --prefix admin install && npm run build
     staticPublishPath: dist
