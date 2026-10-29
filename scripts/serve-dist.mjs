@@ -11,6 +11,7 @@ import { fileURLToPath } from "node:url";
 const root = fileURLToPath(new URL("..", import.meta.url));
 const dist = path.join(root, "dist");
 const port = Number(process.env.PORT || 3000);
+const shouldServe = process.argv.includes("--serve");
 
 const MIME = {
   ".html": "text/html; charset=utf-8",
@@ -81,7 +82,7 @@ const server = http.createServer((req, res) => {
 });
 
 if (!fs.existsSync(dist)) {
-  console.log("dist/ missing — running npm run build (this runs on Start, not during Render Build)...");
+  console.log("dist/ missing — running npm run build...");
   execSync("npm run build", { cwd: root, stdio: "inherit", env: process.env });
 }
 
@@ -94,6 +95,11 @@ if (!fs.existsSync(dist)) {
       "Do NOT put npm start in the Build command."
   );
   process.exit(1);
+}
+
+if (!shouldServe) {
+  console.log("dist/ ready. Use: npm start (or node scripts/serve-dist.mjs --serve)");
+  process.exit(0);
 }
 
 server.listen(port, "0.0.0.0", () => {

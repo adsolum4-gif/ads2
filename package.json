@@ -8,9 +8,8 @@
     "dev:admin": "npm --prefix admin run dev",
     "dev:all": "npm run dev & npm run dev:admin",
     "build": "node scripts/build-all.mjs",
-    "start": "node scripts/serve-dist.mjs",
     "render:build": "npm install && npm --prefix admin install && npm run build",
-    "render:start": "npm run build && npm start",
+    "start": "node scripts/serve-dist.mjs --serve",
     "preview": "vite preview",
     "preview:prod": "npm run build && npm run start"
   },

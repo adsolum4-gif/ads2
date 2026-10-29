@@ -73,7 +73,6 @@ export default function Dashboard() {
       submissionTotal: `${u.total_play}/${u.total_available_play}`,
       profit: u.wallet?.commission,
       connection: u.last_connection ? format(new Date(u.last_connection), "dd MM yyyy h:mma") : "",
-      onHold: u.wallet?.on_hold,
     }));
   }, [data]);
 

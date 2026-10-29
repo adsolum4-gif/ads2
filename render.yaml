@@ -1,17 +1,10 @@
-# Static site (recommended). Do NOT use `npm run dev` as start command on Render.
+# Web service for ads2 — copy these into the Render dashboard if not using Blueprint.
 services:
   - type: web
     name: ads2
-    runtime: static
-    buildCommand: npm install && npm --prefix admin install && npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /admin
-        destination: /admin/index.html
-      - type: rewrite
-        source: /admin/*
-        destination: /admin/index.html
-      - type: rewrite
-        source: /*
-        destination: /index.html
+    runtime: node
+    buildCommand: npm run render:build
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "20"

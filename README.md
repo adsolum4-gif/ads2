@@ -13,12 +13,10 @@ Production (`npm run build`) puts the user app at `/` and the admin app at `/adm
 
 | Setting | Value | Do **not** use |
 |--------|--------|----------------|
-| **Build command** | `npm run render:build` | `npm start` (server must not run here) |
+| **Build command** | `npm run render:build` | `npm start`, `npm install; npm start` |
 | **Start command** | `npm start` | `npm run dev` |
 
-Wrong example that fails: `npm install; npm start` as the **only** build line — that never runs `npm run build` and starts the app during the build step.
-
-If Start runs without a prior build, the app will try to build once at startup (slower). Prefer **`npm run render:build`** in Build.
+If the build log shows `Serving ... on http://0.0.0.0:10000` and never finishes, **`npm start` is in the Build command** — cancel the deploy and fix the two fields above.
 
 **Render (Static Site):** Build `npm run render:build`, publish **`dist`**, rewrites: `/admin` + `/admin/*` → `/admin/index.html`, then `/*` → `/index.html`.
 
