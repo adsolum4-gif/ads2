@@ -1,0 +1,17 @@
+# Static site: user app at /, admin app at /admin (see scripts/build-all.mjs)
+services:
+  - type: web
+    name: adsterra
+    runtime: static
+    buildCommand: npm install && npm --prefix admin install && npm run build
+    staticPublishPath: dist
+    routes:
+      - type: rewrite
+        source: /admin
+        destination: /admin/index.html
+      - type: rewrite
+        source: /admin/*
+        destination: /admin/index.html
+      - type: rewrite
+        source: /*
+        destination: /index.html
