@@ -80,7 +80,11 @@ const server = http.createServer((req, res) => {
 });
 
 if (!fs.existsSync(dist)) {
-  console.error("Missing dist/. Run: npm run build");
+  console.error(
+    "Missing dist/. On Render set Build command to: npm run render:build\n" +
+      "Or set Start command to: npm run render:start\n" +
+      "Locally run: npm run build"
+  );
   process.exit(1);
 }
 
